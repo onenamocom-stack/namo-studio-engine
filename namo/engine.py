@@ -35,11 +35,10 @@ class Runtime:
 class MgRuntime(Runtime):
     """Vector motion graphics through the vendored lemo engine (ink-wash etc). CPU."""
     name = "mg"; kind = "cpu"; cost_per_sec_usd = 0.0
-    def __init__(self):
-        self.engine = ROOT / "ftm"          # ft-motion vendored lemo, as the baap structure
-        self.fallback = ROOT / "lemo"
     def _dir(self):
-        for d in (self.engine, self.fallback):
+        # the engine lives in one of three places, in preference order; the first that
+        # actually has the renderer wins, so a partial bootstrap still works.
+        for d in (ROOT / "lemo", ROOT / "ftm" / "lemo", ROOT / "ftm"):
             if (d / "core/render/video.mjs").exists(): return d
         return None
     def available(self):
