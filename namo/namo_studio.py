@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
 namo_studio.py - the CPU studio: voice + sfx stems (namo_audio.py), then mix + assembly. Never renders pictures.
-usage: python manufacture/namo_studio.py <ep> [OUT_DIR]          OUT_DIR default: <repo>/out/<ep>/
+usage: python namo/namo_studio.py <ep> [OUT_DIR]          OUT_DIR default: <repo>/out/<ep>/
 Specs  : show/episodes.json (beats: shot, kind, dur ... - the picture timeline, shots back to back)
-         + manufacture/plans/<ep>_audio.json (voice, subs, sfx, music, mix; written by namo_audio.py if missing)
+         + namo/plans/<ep>_audio.json (voice, subs, sfx, music, mix; written by namo_audio.py if missing)
 Inputs : OUT/shots/<shot>.mp4 (768x1344 24fps, native ambience), OUT/music/<theme>_s<seed>.wav (optional)
 Outputs: OUT/final.mp4 (each clip trimmed to its dur, centre-crop 756x1344 -> 1080x1920 h264 24fps, AAC 48k stereo,
          -16 LUFS, TP <= -1.5 dBTP, Hindi-track subs burned), OUT/final.hi.srt, OUT/final.en.srt
