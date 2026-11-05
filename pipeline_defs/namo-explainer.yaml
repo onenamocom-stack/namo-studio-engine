@@ -84,7 +84,7 @@ stages:
       - No chapter ends on a summary sentence
 
   - name: beat_grid
-    skill: pipelines/namo/beat-director
+    skill: pipelines/explainer/beat-director
     required_artifacts_in: [script]
     produces: [beat_grid]
     note: >

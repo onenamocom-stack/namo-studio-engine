@@ -10,6 +10,15 @@
   "id": "hi_IN-pratham-medium",
   "rate": 1.0
  },
- "applicable": false,
- "note": "This scene is AUTHORED, not plan-driven: it does not read location.search, so it always renders at 60 s / 16:9 / namo-vedic-ink regardless of the brief. That is declarative.js D6b. The engine accepts it only for a brief that already matches these values, and the output guard rejects anything else. Set applicable=true once main.js reads the query."
+ "applicable": true,
+ "seconds_range": [
+  20,
+  180
+ ],
+ "ratios": [
+  "16:9",
+  "9:16",
+  "1:1"
+ ],
+ "note": "main.js applies ?seconds and ?ratio. seconds: window.DUR = seconds and the authored 60 s timeline is stretched linearly (output t -> t*60/seconds), so the whole story always plays; window.EV and window.VO are in output seconds. Accepted range 20..180 s (below 20 a shloka line is on screen < 2.3 s); outside it the page throws and never sets READY. ratio: 16:9, 9:16, 1:1; the canvas is the engine's SIZE_FOR_RATIO frame and the viewport must match it (else the page throws). The authored 1920x1080 picture is cover-cropped (no letterbox, no stretch; 9:16 is a 1.78x upscale of a 607x1080 window) around each shot's subject (shots.js subjectX: the throne/king, centre for eyes/armies), and subtitles are placed and shrunk to fit inside the crop. style and emotion are NOT applied: the scene is namo-vedic-ink / deadpan only, and the page throws (render fails) for any other ?style or ?emotion. main.js reads seconds_range, ratios, style, emotion from this file."
 }

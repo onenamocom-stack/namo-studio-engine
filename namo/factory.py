@@ -68,6 +68,12 @@ def run_job(job):
     rec["seconds"] = round(time.time()-t0, 1)
     return rec
 
+def dry_run(job, jid):
+    """Plan + feasibility, no render: the same gate run_job applies, so --dry tells the truth."""
+    plan = router.plan(job)
+    ok, why = feasible(plan)
+    return {"id": jid, "state": "DRY" if ok else "BLOCKED", "reason": "feasible" if ok else why, "plan": plan}
+
 def once(dry=False):
     jobs = load(QUEUE, {"jobs": []}).get("jobs", [])
     st = load(STATUS, {"runs": []})
@@ -79,7 +85,7 @@ def once(dry=False):
     for job in todo:
         jid = job.get("id") or job.get("prompt","")[:40]
         try:
-            rec = {"id": jid, "state": "DRY", "plan": router.plan(job)} if dry else run_job(job)
+            rec = dry_run(job, jid) if dry else run_job(job)
         except Exception as e:
             rec = {"id": jid, "state": "CRASHED", "reason": f"{type(e).__name__}: {e}",
                    "trace": traceback.format_exc()[-800:]}

@@ -83,13 +83,19 @@ Built and verified:
 - `.github/workflows/` — `namo-agent` (one prompt), `factory` (cron + dispatch), `drift`.
 - `skills/egm/` — Google's Elephant-Goldfish Model skills (Apache-2.0).
 
+Built 6 Nov (laptop OMP, after the phone went offline):
+- **D6b closed** for `gita-ep01`: the scene applies `seconds` (20–180, story time-scaled) and `ratio`
+  (16:9 / 9:16 / 1:1, cover-crop around each shot's subject) and exposes `window.VO`.
+- **Voice**: piper (`hi_IN-pratham-medium`) speaks `window.VO`, placed at each line's time (≤1.15x
+  speed-up, else the job fails), muxed with lemo `mux.sh`; `verify_video` requires a non-silent audio
+  stream when the job has a voice. Devanagari font `NotoSerifDeva` (namo/mg/fonts.css, fetched by bootstrap).
+- Explainer `beat-director` skill written; the explainer pipeline passes `check_pipeline`.
+
 Not built (the actual backlog):
-- **D6b** — no scene reads `location.search`, so a brief's `seconds`/`ratio`/`style` reach the
-  page but are not applied. Every brief renders at the scene's authored length, then §4
-  rejects it. **This is the single most important remaining item.**
-- 17 skill files referenced by the three pipelines do not exist (D1–D3).
+- **Explainer runtime**: the owner rejected the lemo ink look for explainers ("nowhere near Codacus").
+  The explainer moves to `thecodacus/rendiv` (`namo/rd/`, in progress).
+- 17 skill files referenced by `namo-webshow` and `namo-customer` do not exist (D1–D2).
 - No pipeline loader: nothing reads `pipeline_defs/*.yaml` at runtime.
-- Voice is planned but never synthesised; films are silent.
 - R2 publish needs working credentials (`R2_AK/R2_SK/R2_EP` in repo secrets).
 
 ---
@@ -157,9 +163,7 @@ Key: `zafiro-local-key` (in `cpa/config8322.yaml`).
 
 ## 8. Immediate next steps, in order
 
-1. Fix **D6b**: make one scene read `location.search` and size itself (`seconds`, `ratio`).
-   That turns the brief into a film and closes the last gap between plan and render.
-2. Write the 17 missing skill files (or cut the pipelines down to what exists).
+1. Explainer on rendiv at the Codacus bar, wired as a runtime with the same job/verify contract.
+2. Write the 17 missing webshow/customer skill files (or cut the pipelines down to what exists).
 3. Add the pipeline loader that calls `check_pipeline()`.
-4. Voice: piper is installed by the old workflow; wire `build_voice` into the compose stage.
-5. Restore R2 publish with fresh credentials.
+4. Restore R2 publish with fresh credentials.

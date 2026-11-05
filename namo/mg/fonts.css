@@ -1,0 +1,6 @@
+/* Copied into every film dir by engine.py. Faces are fetched by namo/bootstrap.sh. */
+@font-face {
+  font-family: 'NotoSerifDeva';
+  src: url('/styles/ink-wash/demo/fonts/NotoSerifDevanagari-VF.ttf') format('truetype');
+  font-weight: 100 900;
+}

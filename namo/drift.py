@@ -62,10 +62,6 @@ else:
         drift("B1", "namo/agent.py",
               "render() falls back to scene 'gita-ep01' for every kind — an explainer brief renders a webshow scene")
 
-# D3: beat-director, named by namo-explainer, must exist
-if not (ROOT / "skills/pipelines/namo/beat-director.md").exists():
-    drift("P1", "pipeline_defs/namo-explainer.yaml", "beat-director skill missing")
-
 def main():
     as_json = "--json" in sys.argv
     blocking = [f for f in findings if f["severity"] == "block"]

@@ -113,7 +113,7 @@ def plan(brief):
         "emotion": emotion,
         "voice": {
             "engine": "piper",
-            "id": brief.get("voice") or "hi_IN-pratham-medium" if kind == "webshow" else "en_US-lessac-medium",
+            "id": brief.get("voice") or ("hi_IN-pratham-medium" if kind == "webshow" else "en_US-lessac-medium"),
             **voice,
         },
         "chapters": kind in ("explainer",),
@@ -184,8 +184,8 @@ def render(p):
     step(f"rendering with {p['runtime']} ({p['seconds']}s @ {p['fps']}fps, {p['ratio']})")
     res = rt.render(job, OUT)
     if not res.get("ok"):
-        return {"ok": False, "error": "render failed", "log": res.get("log", "")[-1500:]}
-    good, msg = engine.verify_video(res["out"])
+        return {"ok": False, "error": res.get("error") or "render failed", "log": res.get("log", "")[-1500:]}
+    good, msg = engine.verify_video(res["out"], p["seconds"])
     return {"ok": good, "out": res.get("out"), "guard": msg, "error": None if good else msg}
 
 def voiceover(p):

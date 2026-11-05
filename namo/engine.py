@@ -14,7 +14,7 @@ Design rule taken from the spec, section 6: a runtime that cannot honour the bri
 refuse the job. A film that silently ignores the brief is worse than no film, because it
 looks like success.
 """
-import json, math, os, re, shutil, subprocess, sys, tempfile
+import json, math, os, re, shutil, subprocess, sys, tempfile, wave
 from pathlib import Path
 
 NAMO = Path(__file__).resolve().parent
@@ -47,6 +47,14 @@ SIZE_FOR_RATIO = {
     "1:1":  (1080, 1080),
 }
 BLANK_RATIO = 0.0          # SPEC §4: blank frames <= 0 %
+SILENT_MEAN_DB = -50.0     # SPEC §4: an audio track whose mean volume is below this is silence
+
+# voice: piper models live here (factory.yml caches it); a line may be sped up to fit its
+# slot by at most ATEMPO_MAX, beyond that the job fails - never overlap, never truncate
+VOICES = ROOT / ".voices"
+DEFAULT_VOICE = "hi_IN-pratham-medium"
+ATEMPO_MAX = 1.15
+VOICE_ID = re.compile(r"[a-z]{2,3}_[A-Z]{2}-\w+-\w+")      # piper's <lang>_<REGION>-<name>-<quality>
 
 
 def which(*names):
@@ -121,6 +129,131 @@ def validate_job(job):
     return True, "ok"
 
 
+# ------------------------------------------------------------------ voice (compose stage)
+
+# Read window.DUR / window.VO the way lemo core/render/events.mjs reads DUR / EV, with the
+# render's own --q and --size, so VO arrives in output seconds.
+PAGE_VO_JS = (
+    "import { openDemo, closeServer } from './core/render/page.mjs';"
+    "const [dir, q, w, h] = process.argv.slice(-4);"
+    "const { browser, page } = await openDemo(dir, { w: +w, h: +h, q });"
+    "const r = await page.evaluate(() => ({ dur: window.DUR, vo: window.VO }));"
+    "console.log('NAMO_VO ' + JSON.stringify(r));"
+    "await browser.close(); closeServer();")
+
+
+def _num(x):
+    return not isinstance(x, bool) and isinstance(x, (int, float)) and math.isfinite(x)
+
+
+def page_vo(d, film, qs, ratio):
+    """(dur, vo, err). vo is None when the page exposes no window.VO."""
+    w, h = SIZE_FOR_RATIO[ratio]
+    r = subprocess.run(["node", "--input-type=module", "-e", PAGE_VO_JS, film, qs, str(w), str(h)],
+                       cwd=str(d), env={**os.environ, "PLAYWRIGHT_CHROME": chromium()},
+                       capture_output=True, encoding="utf-8", errors="replace", timeout=300)
+    line = next((l for l in reversed(r.stdout.splitlines()) if l.startswith("NAMO_VO ")), None)
+    if r.returncode != 0 or line is None:
+        return None, None, "could not read window.VO from the page: exited %d; %s" % (
+            r.returncode, ((r.stderr or "") + r.stdout).strip()[-300:] or "no output")
+    got = json.loads(line[len("NAMO_VO "):])
+    if not _num(got.get("dur")) or got["dur"] <= 0:
+        return None, None, "the page exposes no usable window.DUR (%r)" % (got.get("dur"),)
+    return float(got["dur"]), got.get("vo"), None
+
+
+def voice_model(vid):
+    """(model path, err). Fetches the piper model into VOICES when it is not there yet."""
+    if not isinstance(vid, str) or not VOICE_ID.fullmatch(vid):
+        return None, "voice id %r is not a piper voice (<lang>_<REGION>-<name>-<quality>)" % (vid,)
+    model = VOICES / (vid + ".onnx")
+    if not (model.exists() and Path(str(model) + ".json").exists()):
+        r = subprocess.run([sys.executable, "-m", "piper.download_voices", "--data-dir", str(VOICES), vid],
+                           capture_output=True, text=True, timeout=600)
+        if r.returncode != 0 or not model.exists():
+            return None, "piper voice %s unavailable: %s" % (vid, ((r.stderr or "") + r.stdout).strip()[-200:])
+    return model, None
+
+
+def speak(model, text, wav, rate=1.0):
+    """Synthesise one line with piper into wav. (seconds, err)."""
+    cfg = json.loads(Path(str(model) + ".json").read_text(encoding="utf-8"))
+    scale = cfg.get("inference", {}).get("length_scale", 1.0) / rate
+    src = Path(str(wav) + ".txt")
+    src.write_text(text, encoding="utf-8")        # piper reads -i as utf-8; stdin would use the locale
+    r = subprocess.run([sys.executable, "-m", "piper", "-m", str(model), "-i", str(src), "-f", str(wav),
+                        "--length-scale", "%.4f" % scale], capture_output=True, text=True, timeout=300)
+    if r.returncode != 0 or not Path(wav).exists():
+        return None, "piper exited %d: %s" % (r.returncode, ((r.stderr or "") + r.stdout).strip()[-200:])
+    with wave.open(str(wav)) as w:
+        secs = w.getnframes() / float(w.getframerate())
+    if secs <= 0:
+        return None, "piper wrote an empty clip"
+    return secs, None
+
+
+def build_voice(job, vo, dur, work):
+    """
+    Compose stage. One piper clip per window.VO line, placed at its t on a dur-second timeline.
+    A line's slot ends at its `end`, the next line's t, or dur, whichever is first. A clip longer
+    than its slot is sped up by at most ATEMPO_MAX; past that the job fails, naming the line.
+    Returns (mix.wav, per-line report, err).
+    """
+    v = job["voice"]
+    if not isinstance(vo, list) or not vo:
+        return None, [], ("scene %r exposes no window.VO narration, but the job asks for voice %s: "
+                          "refusing to make a silent film" % (job["scene"], v.get("id")))
+    rate = v.get("rate", 1.0)
+    if not _num(rate) or not 0.5 <= rate <= 2.0:
+        return None, [], "job.voice.rate must be a number in 0.5..2.0, got %r" % (rate,)
+    model, err = voice_model(v["id"])
+    if err:
+        return None, [], err
+    vlang = v["id"].split("_")[0]
+    speaks = {vlang, "sa"} if vlang == "hi" else {vlang}      # Sanskrit is spoken by the Hindi voice
+    for l in vo:
+        if not (isinstance(l, dict) and isinstance(l.get("id"), str) and _num(l.get("t"))
+                and isinstance(l.get("text"), str) and l["text"].strip()
+                and isinstance(l.get("lang"), str) and ("end" not in l or _num(l["end"]))):
+            return None, [], "window.VO line %r is not {id, t, end, text, lang}" % (l,)
+        if l["lang"] not in speaks:
+            return None, [], "VO line %s is lang %r; voice %s speaks %s" % (
+                l["id"], l["lang"], v["id"], "/".join(sorted(speaks)))
+
+    lines = sorted(vo, key=lambda l: l["t"])
+    report, ins, fl = [], [], []
+    for i, l in enumerate(lines):
+        nxt = lines[i + 1]["t"] if i + 1 < len(lines) else dur
+        slot = min(l.get("end", nxt), nxt, dur) - l["t"]
+        if l["t"] < 0 or slot <= 0:
+            return None, report, "VO line %s at %.2fs has no room on a %.2fs timeline" % (l["id"], l["t"], dur)
+        clip = work / ("vo%02d.wav" % i)
+        secs, err = speak(model, l["text"], clip, rate)
+        if err:
+            return None, report, "VO line %s: %s" % (l["id"], err)
+        tempo = max(1.0, secs / slot)
+        if tempo > ATEMPO_MAX:
+            return None, report, ("VO line %s speaks %.2fs but its slot is %.2fs (from %.2fs): needs %.2fx, "
+                                  "more than %.2fx. Shorten the line or widen its slot."
+                                  % (l["id"], secs, slot, l["t"], tempo, ATEMPO_MAX))
+        report.append({"id": l["id"], "t": l["t"], "slot": round(slot, 2), "spoken": round(secs, 2),
+                       "tempo": round(tempo, 3), "placed": round(secs / tempo, 2)})
+        ins += ["-i", str(clip)]
+        fl.append("[%d:a]aresample=48000%s,adelay=%d:all=1[a%d]"
+                  % (i, ",atempo=%.5f" % tempo if tempo > 1 else "", round(l["t"] * 1000), i))
+    mix = work / "mix.wav"
+    # length by -t, not atrim: after atempo+adelay, atrim cut a 10 s timeline to 9 s
+    fl.append("%samix=inputs=%d:normalize=0,apad=whole_dur=%.3f[m]"
+              % ("".join("[a%d]" % i for i in range(len(lines))), len(lines), dur))
+    r = subprocess.run([which("ffmpeg"), "-y", "-v", "error", *ins, "-filter_complex", ";".join(fl),
+                        "-map", "[m]", "-t", "%.3f" % dur, "-ac", "2", "-ar", "48000", "-c:a", "pcm_s16le",
+                        str(mix)],
+                       capture_output=True, text=True)
+    if r.returncode != 0 or not mix.exists():
+        return None, report, "voice mix failed: %s" % (r.stderr or "").strip()[-200:]
+    return mix, report, None
+
+
 # ------------------------------------------------------------------ §3 runtimes
 
 class Runtime:
@@ -165,9 +298,9 @@ class MgRuntime(Runtime):
             return False, "node missing"
         if not chromium():
             return False, "no chrome/chromium and PLAYWRIGHT_CHROME unset"
-        for b in ("ffmpeg", "ffprobe"):
+        for b in ("ffmpeg", "ffprobe", "sh"):
             if not which(b):
-                return False, b + " missing (needed by SPEC §4)"
+                return False, b + " missing (needed to compose and verify, SPEC §4)"
         scenes = self.scenes()
         if not scenes:
             return False, "no scene with a scene.json under namo/mg/scenes"
@@ -218,7 +351,19 @@ class MgRuntime(Runtime):
                     shutil.rmtree(locals().get("outdir", Path("/nonexistent")), ignore_errors=True)
             except Exception as e:
                 return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
-        return True, "engine=%s scenes=%d, chrome ok, one still rendered" % (d.name, len(scenes))
+        # every job carries a voice (SPEC §2), so a runtime that cannot speak cannot make a film
+        model, err = voice_model(DEFAULT_VOICE)
+        if err:
+            return False, "voice: " + err
+        tmp = Path(tempfile.mkdtemp(prefix="namo-probe-voice-"))
+        try:
+            secs, err = speak(model, "नमो", tmp / "probe.wav")
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+        if err:
+            return False, "voice %s: %s" % (DEFAULT_VOICE, err)
+        return True, "engine=%s scenes=%d, chrome ok, one still rendered, voice %s spoke %.2fs" % (
+            d.name, len(scenes), DEFAULT_VOICE, secs)
 
     def scene_meta(self, scene):
         """Read and validate the scene's own declaration. Fail closed on anything unclear."""
@@ -314,6 +459,16 @@ class MgRuntime(Runtime):
                 "kind=%s" % job["kind"],
                 "renderjson=1",
             ])
+            # Voice before pictures: the narration is cheap to check and a scene that cannot
+            # be voiced should fail in seconds, not after a full render.
+            dur, vo, err = page_vo(d, "films/" + tag, qs, job["ratio"])
+            if err:
+                return {"ok": False, "error": err}
+            mix, lines, err = build_voice(job, vo, dur, film)
+            if err:
+                return {"ok": False, "error": err, "voice": lines}
+
+            silent = film / "silent.mp4"
             env = {**os.environ, "PLAYWRIGHT_CHROME": chromium(),
                    "NAMO_JOB": json.dumps(job)}
             cmd = ["node", "core/render/video.mjs", "films/" + tag,
@@ -321,7 +476,7 @@ class MgRuntime(Runtime):
                    "--workers", str(int(job.get("workers", 4))),
                    "--q", qs,
                    "--size", "%dx%d" % SIZE_FOR_RATIO[job["ratio"]],
-                   "--out", str(out)]
+                   "--out", str(silent)]
             try:
                 r = subprocess.run(cmd, cwd=str(d), env=env, capture_output=True, text=True)
             except FileNotFoundError as e:
@@ -336,14 +491,22 @@ class MgRuntime(Runtime):
                         "cmd": " ".join(cmd), "cwd": str(d),
                         "log": log[-3000:] or "(both stdout and stderr were empty)",
                         "video_mjs": str(d / "core/render/video.mjs") if d else ""}
-            if not out.exists():
+            if not silent.exists():
                 return {"ok": False, "error": "lemo reported success but wrote no file", "log": log}
+            # compose: lemo's mux (two-pass loudnorm); grain 0, every mg style is vector
+            m = subprocess.run([which("sh"), "core/render/mux.sh", silent.as_posix(), mix.as_posix(),
+                                out.as_posix(), str(int(job["fps"])), "0"],
+                               cwd=str(d), capture_output=True, text=True)
+            log += "\n" + ((m.stdout or "") + (m.stderr or "")).strip()
+            if m.returncode != 0 or not out.exists():
+                return {"ok": False, "error": "mux exited %d" % m.returncode, "log": log[-3000:], "voice": lines}
             # SPEC §4 / O1: success is not "a file appeared". Verify here, so a caller using
             # REGISTRY directly gets the same guarantee as the CLI.
-            good, msg = verify_video(out, job["seconds"])
+            good, msg = verify_video(out, job["seconds"], job["voice"])
             if not good:
-                return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log}
-            return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log}
+                return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
+            return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log,
+                    "voice": lines}
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
@@ -422,10 +585,11 @@ def register_proven():
 
 # ------------------------------------------------------------------ §4 verify
 
-def verify_video(path, seconds):
+def verify_video(path, seconds, voice=None):
     """
     SPEC §4 / O1-O3. Returns (ok, reason).
     A failure to run a check is a failure: no bare except that returns True.
+    With a voice, the film must also carry an audio stream of the same length that is not silent.
     """
     if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) \
             or not math.isfinite(seconds) or seconds <= 0:
@@ -457,7 +621,7 @@ def verify_video(path, seconds):
     ffmpeg = which("ffmpeg")
     if not ffmpeg:
         return False, "ffmpeg missing: cannot sample pixels (SPEC §4 O2 says reject, not pass)"
-    proc = subprocess.run([ffmpeg, "-v", "error", "-i", str(p),
+    proc = subprocess.run([ffmpeg, "-v", "error", "-i", str(p), "-an",
                            "-vf", "fps=1,scale=64:36", "-f", "rawvideo", "-pix_fmt", "gray", "-"],
                           capture_output=True)
     if proc.returncode != 0:
@@ -480,7 +644,31 @@ def verify_video(path, seconds):
     ratio = flat / float(n)
     if ratio > BLANK_RATIO:
         return False, "%d of %d sampled frames are blank (%.0f%%)" % (flat, n, ratio * 100)
-    return True, "%.1fs, %d frames sampled, 0 blank" % (dur, n)
+    if not voice:
+        return True, "%.1fs, %d frames sampled, 0 blank" % (dur, n)
+
+    r = subprocess.run([ffprobe, "-v", "error", "-select_streams", "a:0", "-show_entries",
+                        "stream=duration", "-of", "csv=p=0", str(p)], capture_output=True, text=True)
+    if r.returncode != 0 or not r.stdout.strip():
+        return False, "the job has voice %s but the film has no audio stream" % voice.get("id")
+    try:
+        adur = float(r.stdout.split()[0])
+    except ValueError:
+        return False, "ffprobe returned no audio duration (%r)" % r.stdout.strip()[:40]
+    if abs(adur - float(seconds)) > tol:
+        return False, "audio %.2fs is outside %.2fs +/- %.2fs" % (adur, seconds, tol)
+    r = subprocess.run([ffmpeg, "-hide_banner", "-nostats", "-i", str(p), "-map", "0:a:0",
+                        "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True)
+    mean = re.search(r"mean_volume:\s*(-?inf|-?[\d.]+) dB", r.stderr or "")
+    peak = re.search(r"max_volume:\s*(-?inf|-?[\d.]+) dB", r.stderr or "")
+    if r.returncode != 0 or not mean or not peak:
+        return False, "could not measure the audio level: %s" % (r.stderr or "").strip()[-140:]
+    mean, peak = float(mean.group(1)), float(peak.group(1))
+    if mean < SILENT_MEAN_DB:
+        return False, "audio is silent: mean %.1f dB, max %.1f dB (silence is below %.0f dB mean)" % (
+            mean, peak, SILENT_MEAN_DB)
+    return True, "%.1fs, %d frames sampled, 0 blank; audio %.1fs, mean %.1f dB, max %.1f dB" % (
+        dur, n, adur, mean, peak)
 
 
 # ------------------------------------------------------------------ §5 pipelines
@@ -607,6 +795,9 @@ def main(argv):
         res = rt.render(job, outdir)
         if res.get("log"):
             print(res["log"][-1500:])
+        for l in res.get("voice", []):
+            print("voice %-6s t=%6.2fs slot %5.2fs spoken %5.2fs tempo %.3f placed %5.2fs"
+                  % (l["id"], l["t"], l["slot"], l["spoken"], l["tempo"], l["placed"]))
         if not res.get("ok"):
             print("RENDER FAILED: %s" % res.get("error"))
             return 1
@@ -615,7 +806,7 @@ def main(argv):
                   % (res.get("produces"), len(res.get("stems", [])),
                      Path(res.get("manifest", "")).parent))
             return 0
-        good, msg = verify_video(res["out"], job["seconds"])
+        good, msg = verify_video(res["out"], job["seconds"], job["voice"])
         print(("PASS " if good else "REJECT ") + msg)
         return 0 if good else 1
 

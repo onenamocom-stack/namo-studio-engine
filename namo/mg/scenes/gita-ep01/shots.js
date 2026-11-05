@@ -128,6 +128,20 @@ export function frame(t, A, B, TMP) {
   return shotClose(A, t);
 }
 
+// Authored-frame x (of 1920) of what each shot is about, so a narrower ratio can crop around it.
+// Mirrors frame()'s schedule and each shot's camera.
+export function subjectX(t) {
+  const hall = () => { const c = W.camXf(t); return 960 + c.z * (W.THRONE[0] - c.x); };
+  if (t < T.hallIn) return 960;
+  if (t < T.eyes) return hall();
+  if (t < T.eyes + 6.4) return 960;                                // shotEyes centres the eyes
+  if (t < T.field) return hall();                                  // the vision blooms over the hall
+  if (t < T.chariot) return 960;                                   // the armies span the frame
+  if (t < T.close) return 2300 + clamp((t - T.chariot) / 6) * 40;  // shotChariot's chariot x
+  const u = clamp((t - T.close) / 5);
+  return 960 + (1 + .06 * u) * (W.THRONE[0] - (3800 + u * 60));   // shotClose's camera
+}
+
 export function subPos(id, t) {
   // each shot's liubai (left blank space) — the inscription goes where the paper is empty
   switch (id) {

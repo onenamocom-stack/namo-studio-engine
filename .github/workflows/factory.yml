@@ -44,6 +44,19 @@ jobs:
       - name: bootstrap engines
         run: bash namo/bootstrap.sh
 
+      # voice: piper runs under the same python3 as namo/engine.py (not .venv), so it is
+      # installed there. Models are cached; engine.voice_model() fetches any other id on demand.
+      - uses: actions/cache@v4
+        with:
+          path: .voices
+          key: piper-voices-v1-hi_IN-pratham-medium-en_US-lessac-medium
+
+      - name: voice (piper)
+        run: |
+          python3 -m pip install -q piper-tts==1.3.0
+          python3 -m piper.download_voices --data-dir .voices hi_IN-pratham-medium en_US-lessac-medium
+          ls -la .voices
+
       - name: probe
         run: python3 namo/engine.py probe || true
 

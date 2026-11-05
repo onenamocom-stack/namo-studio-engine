@@ -33,7 +33,8 @@ for base in lemo ftm/lemo; do
   mkdir -p "$F"
   for u in cormorantsc/CormorantSC-Regular.ttf cormorantsc/CormorantSC-SemiBold.ttf \
            cormorantgaramond/CormorantGaramond%5Bwght%5D.ttf cormorantgaramond/CormorantGaramond-Italic%5Bwght%5D.ttf \
-           mashanzheng/MaShanZheng-Regular.ttf zhimangxing/ZhiMangXing-Regular.ttf; do
+           mashanzheng/MaShanZheng-Regular.ttf zhimangxing/ZhiMangXing-Regular.ttf \
+           notoserifdevanagari/NotoSerifDevanagari%5Bwdth,wght%5D.ttf; do
     n=$(basename "$u" | sed 's/%5B.*%5D/-VF/')
     [ -s "$F/$n" ] || curl -fsSL -o "$F/$n" "https://github.com/google/fonts/raw/main/ofl/$u" || true
   done
