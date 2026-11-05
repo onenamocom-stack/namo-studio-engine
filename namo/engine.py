@@ -185,7 +185,37 @@ class MgRuntime(Runtime):
                 return False, "chrome exited %d" % r.returncode
         except Exception as e:
             return False, "chrome did not run: %s" % str(e)[:80]
-        return True, "engine=%s scenes=%d, node/ffmpeg/ffprobe/chrome all run" % (d.name, len(scenes))
+        # Invariant R1: prove it renders. One still, from the smallest scene, thrown away.
+        # A version check says the tool exists; this says it works.
+        if os.environ.get("NAMO_PROBE_RENDER", "1") == "1":
+            try:
+                scene = scenes[0]
+                work = Path(tempfile.mkdtemp(prefix="namo-probe-"))
+                try:
+                    film = work / "films" / scene
+                    film.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(SCENES / scene, film)
+                    css = NAMO / "mg" / "fonts.css"
+                    if css.exists():
+                        shutil.copy(css, film / "fonts.css")
+                    out = work / "still.jpg"
+                    env = {**os.environ, "PLAYWRIGHT_CHROME": chromium()}
+                    pr = subprocess.run(
+                        ["node", "core/render/still.mjs", "films/" + scene, "1.0",
+                         "--out", str(work), "--prefix", "still_"],
+                        cwd=str(d), env=env, capture_output=True, text=True, timeout=180)
+                    made = sorted(work.glob("still_*.jpg"))
+                    if pr.returncode != 0 or not made:
+                        return False, ("render probe failed: exited %d, %d still(s)%s"
+                                       % (pr.returncode, len(made),
+                                          "; " + ((pr.stderr or pr.stdout or "").strip()[-260:] or "no output")))
+                    if made[0].stat().st_size < 1000:
+                        return False, "render probe produced a %d-byte still" % made[0].stat().st_size
+                finally:
+                    shutil.rmtree(work, ignore_errors=True)
+            except Exception as e:
+                return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
+        return True, "engine=%s scenes=%d, chrome ok, one still rendered" % (d.name, len(scenes))
 
     def scene_meta(self, scene):
         """Read and validate the scene's own declaration. Fail closed on anything unclear."""
