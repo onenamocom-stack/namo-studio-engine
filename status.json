@@ -1,1 +1,21 @@
-{"runs": []}
+{
+ "runs": [
+  {
+   "id": "gita-ep01",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-05T19:49:47Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "state": "BLOCKED",
+   "reason": "unknown runtime 'mg'",
+   "seconds": 0.0
+  }
+ ]
+}
