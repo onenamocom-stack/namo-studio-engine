@@ -40,7 +40,7 @@ function shotHall(A, t) {
   A.cw.save(); A.cw.globalCompositeOperation = 'lighter';
   S.setTransform(1, 0, 0, 1, 0, 0);
   S.translate(960, 540); S.scale(cam.z, cam.z); S.translate(-cam.x, -540);
-  S.drawImage(LAY.lamps.col.canvas, 0, 0);
+  S.drawImage(LAY.lamps.col, 0, 0);
   S.restore();
   return { paper: [0, 0, 1], bleed: 2.6, rim: .55, warm: .05 };
 }
