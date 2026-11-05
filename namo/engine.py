@@ -9,6 +9,8 @@ This file implements SPEC.md section by section. Every rule below names its sect
     python namo/engine.py render <job.json>  validate, render, verify
     python namo/engine.py pipeline <yaml>    refuse a pipeline whose skills are missing
     python namo/engine.py checkjob <json>    validate only
+    python namo/engine.py fitbeats <beats.json> [voice] [rate]
+                                             retime an rd beats file so its narration fits
 
 Design rule taken from the spec, section 6: a runtime that cannot honour the brief must
 refuse the job. A film that silently ignores the brief is worse than no film, because it
@@ -29,7 +31,7 @@ REQUIRED = ("schema", "kind", "runtime", "scene", "seconds", "fps",
             "ratio", "style", "emotion", "voice", "name")
 ENUMS = {
     "kind": {"webshow", "explainer", "customer", "shot-test"},
-    "runtime": {"mg", "h3"},
+    "runtime": {"mg", "h3", "rd"},
     "ratio": {"16:9", "9:16", "1:1"},
     "emotion": {"calm", "energetic", "dramatic", "deadpan"},
 }
@@ -109,8 +111,8 @@ def validate_job(job):
         return False, "job.workers must be an integer 1-32, got %r" % (workers,)
 
     scene = str(job["scene"])
-    if "/" in scene or scene in (".", "..") or scene.startswith("."):
-        return False, "job.scene must be a plain directory name inside namo/mg/scenes"
+    if "/" in scene or "\\" in scene or scene in (".", "..") or scene.startswith("."):
+        return False, "job.scene must be a plain name (namo/mg/scenes/<scene>/ or namo/rd/beats/<scene>.json)"
 
     voice = job["voice"]
     if not isinstance(voice, dict) or not voice.get("engine") or not voice.get("id"):
@@ -254,6 +256,62 @@ def build_voice(job, vo, dur, work):
     return mix, report, None
 
 
+def probe_voice():
+    """(ok, msg). Every job carries a voice (SPEC §2): a runtime that cannot speak cannot make a film."""
+    model, err = voice_model(DEFAULT_VOICE)
+    if err:
+        return False, "voice: " + err
+    tmp = Path(tempfile.mkdtemp(prefix="namo-probe-voice-"))
+    try:
+        secs, err = speak(model, "नमो", tmp / "probe.wav")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    if err:
+        return False, "voice %s: %s" % (DEFAULT_VOICE, err)
+    return True, "voice %s spoke %.2fs" % (DEFAULT_VOICE, secs)
+
+
+def fit_beats(path, voice_id=DEFAULT_VOICE, rate=1.0, pad=0.4):
+    """
+    Retime an rd beats file so every beat's `vo` line fits its beat when spoken by piper at
+    `rate` (+ `pad` s breath), keeping the total length. Beats that overrun take time from
+    beats with room, in proportion to that room. Rewrites the file. (rows, err)
+    """
+    p = Path(path)
+    doc = json.loads(p.read_text(encoding="utf-8"))
+    beats = doc["beats"]
+    total = sum(b["dur"] for b in beats)
+    model, err = voice_model(voice_id)
+    if err:
+        return [], err
+    tmp = Path(tempfile.mkdtemp(prefix="namo-fit-"))
+    try:
+        spoken = []
+        for b in beats:
+            secs, err = speak(model, b["vo"], tmp / (b["id"] + ".wav"), rate) if b.get("vo") else (0.0, None)
+            if err:
+                return [], "beat %s: %s" % (b["id"], err)
+            spoken.append(secs)
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+    need = [s + pad if s else 0.0 for s in spoken]
+    if sum(need) > total:
+        return [], "narration needs %.1fs (incl. %.1fs pad per line) but the film is %.1fs: shorten lines" % (
+            sum(need), pad, total)
+    room = [max(0.0, b["dur"] - n) for b, n in zip(beats, need)]
+    short = sum(max(0.0, n - b["dur"]) for b, n in zip(beats, need))
+    keep = 1 - short / sum(room) if short else 1.0
+    durs = [round(max(n, b["dur"]) if r == 0 else n + r * keep, 2) for b, n, r in zip(beats, need, room)]
+    durs[-1] = round(total - sum(durs[:-1]), 2)
+    rows, t = [], 0.0
+    for b, d, s in zip(beats, durs, spoken):
+        rows.append({"id": b["id"], "was": b["dur"], "dur": d, "spoken": round(s, 2), "fill": round(s / d, 2)})
+        b["t"], b["dur"] = round(t, 2), d
+        t += d
+    p.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
+    return rows, None
+
+
 # ------------------------------------------------------------------ §3 runtimes
 
 class Runtime:
@@ -351,19 +409,10 @@ class MgRuntime(Runtime):
                     shutil.rmtree(locals().get("outdir", Path("/nonexistent")), ignore_errors=True)
             except Exception as e:
                 return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
-        # every job carries a voice (SPEC §2), so a runtime that cannot speak cannot make a film
-        model, err = voice_model(DEFAULT_VOICE)
-        if err:
-            return False, "voice: " + err
-        tmp = Path(tempfile.mkdtemp(prefix="namo-probe-voice-"))
-        try:
-            secs, err = speak(model, "नमो", tmp / "probe.wav")
-        finally:
-            shutil.rmtree(tmp, ignore_errors=True)
-        if err:
-            return False, "voice %s: %s" % (DEFAULT_VOICE, err)
-        return True, "engine=%s scenes=%d, chrome ok, one still rendered, voice %s spoke %.2fs" % (
-            d.name, len(scenes), DEFAULT_VOICE, secs)
+        ok, voiced = probe_voice()
+        if not ok:
+            return False, voiced
+        return True, "engine=%s scenes=%d, chrome ok, one still rendered, %s" % (d.name, len(scenes), voiced)
 
     def scene_meta(self, scene):
         """Read and validate the scene's own declaration. Fail closed on anything unclear."""
@@ -567,7 +616,118 @@ class H3Runtime(Runtime):
                 "manifest": str(manifest), "log": log}
 
 
-CANDIDATES = {rt.name: rt for rt in (MgRuntime(), H3Runtime())}
+class RdRuntime(Runtime):
+    """
+    rendiv (React + TypeScript) motion-design explainers, namo/rd. CPU, free.
+    The scene is a beats file, namo/rd/beats/<scene>.json; its `vo` lines are the narration.
+    Voice and mux are the mg compose stage: build_voice() and lemo's mux.sh.
+    """
+    name = "rd"
+    kind = "cpu"
+    produces = "film"
+    cost_per_sec_usd = 0.0
+
+    def __init__(self):
+        self.dir = NAMO / "rd"
+
+    def beats(self):
+        return sorted(p.stem for p in (self.dir / "beats").glob("*.json"))
+
+    def node(self, args, timeout=None):
+        return subprocess.run(["node", "render.mjs", *args], cwd=str(self.dir), capture_output=True,
+                              encoding="utf-8", errors="replace", timeout=timeout)
+
+    def mux_sh(self):
+        d = MgRuntime().engine_dir()
+        return d / "core" / "render" / "mux.sh" if d else None
+
+    def probe(self):
+        for b in ("node", "ffmpeg", "ffprobe", "sh"):
+            if not which(b):
+                return False, b + " missing"
+        if not (self.dir / "node_modules" / "@rendiv" / "renderer").is_dir():
+            return False, "namo/rd deps missing (cd namo/rd && npm ci && npx playwright install chromium)"
+        if not self.mux_sh():
+            return False, "lemo core/render/mux.sh not found (run namo/bootstrap.sh); rd composes with it"
+        beats = self.beats()
+        if not beats:
+            return False, "no beats file under namo/rd/beats"
+        # R1: prove it renders - one second of the first beats file at 320x180, thrown away
+        if os.environ.get("NAMO_PROBE_RENDER", "1") == "1":
+            tmp = Path(tempfile.mkdtemp(prefix="namo-rd-probe-"))
+            try:
+                film = tmp / "probe.mp4"
+                r = self.node(["--beats", str(self.dir / "beats" / (beats[0] + ".json")), "--seconds", "1",
+                               "--size", "320x180", "--fps", "10", "--concurrency", "1", "--out", str(film)],
+                              timeout=300)
+                if r.returncode != 0 or not film.exists() or film.stat().st_size < 1000:
+                    return False, "render probe failed: exited %d; %s" % (
+                        r.returncode, ((r.stderr or "") + (r.stdout or "")).strip()[-260:] or "no output")
+            except Exception as e:
+                return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
+            finally:
+                shutil.rmtree(tmp, ignore_errors=True)
+        ok, voiced = probe_voice()
+        if not ok:
+            return False, voiced
+        return True, "beats=%d, 1 s film rendered, %s" % (len(beats), voiced)
+
+    def render(self, job, outdir):
+        ok, why = validate_job(job)
+        if not ok:
+            return {"ok": False, "error": why}
+        src = self.dir / "beats" / (job["scene"] + ".json")
+        if not src.exists():
+            return {"ok": False, "error": "beats file namo/rd/beats/%s.json is not on disk (have: %s)"
+                    % (job["scene"], ", ".join(self.beats()) or "none")}
+        try:
+            declared = json.loads(src.read_text(encoding="utf-8")).get("kind")
+        except Exception as e:
+            return {"ok": False, "error": "beats file %s unreadable: %s" % (src.name, e)}
+        if declared != job["kind"]:      # SPEC §6: never render another kind's film
+            return {"ok": False, "error": "beats %r is for kind %r, the brief asks for %r"
+                    % (job["scene"], declared, job["kind"])}
+
+        outdir = Path(outdir).resolve()
+        outdir.mkdir(parents=True, exist_ok=True)
+        out = outdir / (sanitise_name(job["name"]) + ".mp4")
+        if out.exists():
+            out.unlink()            # SPEC §4 / O3
+        work = Path(tempfile.mkdtemp(prefix="namo-rd-"))
+        try:
+            silent = work / "silent.mp4"
+            base = ["--beats", str(src), "--seconds", str(job["seconds"]), "--ratio", job["ratio"],
+                    "--fps", str(int(job["fps"])), "--out", str(silent)]
+            # voice before pictures: the narration is cheap to check, the render is not
+            r = self.node(base + ["--vo-only", "1"], timeout=120)
+            vo_file = work / "silent.vo.json"
+            if r.returncode != 0 or not vo_file.exists():
+                return {"ok": False, "error": "render.mjs --vo-only exited %d" % r.returncode,
+                        "log": ((r.stderr or "") + (r.stdout or ""))[-1500:]}
+            mix, lines, err = build_voice(job, json.loads(vo_file.read_text(encoding="utf-8")),
+                                          float(job["seconds"]), work)
+            if err:
+                return {"ok": False, "error": err, "voice": lines}
+
+            r = self.node(base + ["--concurrency", str(int(job.get("workers", 4)))])
+            log = ((r.stdout or "") + (r.stderr or "")).strip()
+            if r.returncode != 0 or not silent.exists():
+                return {"ok": False, "error": "rendiv exited %d" % r.returncode, "log": log[-3000:], "voice": lines}
+            mux = self.mux_sh()
+            m = subprocess.run([which("sh"), mux.as_posix(), silent.as_posix(), mix.as_posix(), out.as_posix(),
+                                str(int(job["fps"])), "0"], cwd=str(mux.parents[2]), capture_output=True, text=True)
+            log += "\n" + ((m.stdout or "") + (m.stderr or "")).strip()
+            if m.returncode != 0 or not out.exists():
+                return {"ok": False, "error": "mux exited %d" % m.returncode, "log": log[-3000:], "voice": lines}
+            good, msg = verify_video(out, job["seconds"], job["voice"])
+            if not good:
+                return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
+            return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log, "voice": lines}
+        finally:
+            shutil.rmtree(work, ignore_errors=True)
+
+
+CANDIDATES = {rt.name: rt for rt in (MgRuntime(), H3Runtime(), RdRuntime())}
 REGISTRY = {}
 
 
@@ -767,6 +927,13 @@ def main(argv):
         ok, why = validate_job(json.loads(Path(argv[1]).read_text()))
         print(("PASS " if ok else "REFUSE ") + why)
         return 0 if ok else 1
+
+    if cmd == "fitbeats":
+        rows, err = fit_beats(argv[1], *(argv[2:3] or [DEFAULT_VOICE]), *[float(x) for x in argv[3:4]])
+        for r in rows:
+            print("%-5s dur %5.2fs -> %5.2fs  spoken %5.2fs  fill %.2f" % (r["id"], r["was"], r["dur"], r["spoken"], r["fill"]))
+        print(("FAIL " + err) if err else "fitted %s" % argv[1])
+        return 1 if err else 0
 
     if cmd == "pipeline":
         ok, missing, why = check_pipeline(argv[1])

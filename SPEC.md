@@ -34,8 +34,8 @@ Measured behaviour (this is the test table; `namo/drift.py` runs it):
 
 | brief | kind | runtime | style | seconds | ratio | emotion |
 |---|---|---|---|---|---|---|
-| "30 second explainer about Jev mode" | explainer | mg | flat-motion-graphics | 30 | 16:9 | energetic |
-| "40 sec vertical reel about jewellery" | explainer | mg | flat-motion-graphics | 40 | 9:16 | energetic |
+| "30 second explainer about Jev mode" | explainer | rd | flat-motion-graphics | 30 | 16:9 | energetic |
+| "40 sec vertical reel about jewellery" | explainer | rd | flat-motion-graphics | 40 | 9:16 | energetic |
 | "gita chapter 2 episode 3, 60 seconds" | webshow | mg | namo-vedic-ink | 60 | 16:9 | deadpan |
 | "2 min dramatic cinematic promo" | customer | mg | clean-professional | 120 | 16:9 | dramatic |
 | "5 second test" | shot-test | mg | minimalist-diagram | 5 | 16:9 | deadpan |
@@ -59,7 +59,7 @@ a job that is missing a required key, before any renderer is called.
 {
   "schema": "namo.job/1",
   "kind":     "webshow | explainer | customer | shot-test",
-  "runtime":  "mg | h3",
+  "runtime":  "mg | h3 | rd",
   "scene":    "gita-ep01",
   "seconds":  60,
   "fps":      24,
@@ -110,12 +110,14 @@ A runtime is a class with `name`, `kind`, `cost_per_sec_usd`, `max_seconds`, `pr
 |---|---|---|---|---|
 | `mg` | cpu | `film` | 0 | vector motion graphics through lemo |
 | `h3` | gpu | `stems` | $0.00039/s | MiniMax H3 image-to-video clips, raw, per GPU_CONTRACT |
+| `rd` | cpu | `film` | 0 | rendiv (React) motion-design explainers from `namo/rd/beats/<scene>.json` |
 
 **Invariant R1:** a runtime enters `REGISTRY` only if `probe()` proves it works.
 `probe()` must exercise the thing, not merely observe that files exist:
 
 - `mg.probe()` checks lemo, node, chrome, **ffmpeg and ffprobe**, and that a scene exists.
 - `h3.probe()` makes one authenticated call to the provider and fails on a non-200.
+- `rd.probe()` renders one second of a beats file at 320x180 and makes the voice speak.
 
 **Invariant R2:** `engine.REGISTRY` is the only door. No pipeline, workflow or script calls a
 renderer directly. `REGISTRY` is populated at import, so any importer sees the same runtimes.

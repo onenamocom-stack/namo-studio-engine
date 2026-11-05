@@ -35,7 +35,7 @@ OUT = ROOT / "out"
 
 KINDS = {
     "webshow":   dict(keywords=["gita","shloka","mahabharata","episode","chapter","verse","dharma","krishna","arjuna","namo"], ratio="16:9", runtime="mg", style="namo-vedic-ink", emotion="deadpan"),
-    "explainer": dict(keywords=["explain","how","why","what is","tutorial","guide","walkthrough","deep dive"], ratio="16:9", runtime="mg", style="flat-motion-graphics", emotion="energetic"),
+    "explainer": dict(keywords=["explain","how","why","what is","tutorial","guide","walkthrough","deep dive"], ratio="16:9", runtime="rd", style="flat-motion-graphics", emotion="energetic"),
     "customer":  dict(keywords=["ad","promo","campaign","brand","client","launch","commercial","product"], ratio="16:9", runtime="mg", style="clean-professional", emotion="calm"),
     "shot-test": dict(keywords=["test","probe","smoke"], ratio="16:9", runtime="mg", style="minimalist-diagram", emotion="deadpan"),
 }
@@ -105,6 +105,7 @@ def plan(brief):
         "kind": kind,
         "kind_confidence": hit,
         "runtime": brief.get("runtime") or spec["runtime"],
+        "scene": brief.get("scene"),      # mg: namo/mg/scenes/<scene>/, rd: namo/rd/beats/<scene>.json
         "style": style,
         "look": look,
         "seconds": seconds,
@@ -117,10 +118,10 @@ def plan(brief):
             **voice,
         },
         "chapters": kind in ("explainer",),
-        "budget_usd": float(brief.get("budget_usd") or (0.0 if spec["runtime"] == "mg" else 1.50)),
+        "budget_usd": float(brief.get("budget_usd") or (0.0 if spec["runtime"] in ("mg", "rd") else 1.50)),
         "decision": {
             "why_kind": f"{hit} keyword hit(s)" if hit else "no keyword hit, defaulted to explainer",
-            "why_runtime": "vector is free and deterministic" if spec["runtime"] == "mg" else "needs real motion footage",
+            "why_runtime": "CPU motion graphics are free and deterministic" if spec["runtime"] in ("mg", "rd") else "needs real motion footage",
         },
     }
 
@@ -134,13 +135,16 @@ def step(msg): print(f"[agent] {msg}", flush=True)
 
 SCENE_FOR_KIND = {
     # a kind maps to a scene only when that scene actually exists for it.
-    # gita-ep01 is a webshow scene; the explainer/customer kinds have none yet, on purpose.
+    # gita-ep01 is a webshow scene. An explainer is one beats file per topic, so it has no
+    # default: the brief names it (scene=<beats name>), or the job is refused.
     "webshow": "gita-ep01",
 }
 
 def SCENES_AVAILABLE():
-    d = NAMO / "mg" / "scenes"
-    return {x.name for x in d.iterdir() if x.is_dir()} if d.exists() else set()
+    """mg scene dirs and rd beats files: the names a job's `scene` may take."""
+    d, beats = NAMO / "mg" / "scenes", NAMO / "rd" / "beats"
+    return ({x.name for x in d.iterdir() if x.is_dir()} if d.exists() else set()) | \
+           ({x.stem for x in beats.glob("*.json")} if beats.exists() else set())
 
 def render(p):
     """Hand the plan to the engine. The engine owns the renderers; the agent owns the decision."""
@@ -155,7 +159,8 @@ def render(p):
         have = ", ".join(sorted(SCENES_AVAILABLE())) or "none"
         return {"ok": False,
                 "error": f"no scene authored for kind '{p['kind']}'. "
-                         f"scenes on disk: {have}. Add namo/mg/scenes/<name>/ or pass scene=<name>."}
+                         f"scenes on disk: {have}. Add namo/mg/scenes/<name>/ or namo/rd/beats/<name>.json, "
+                         f"or pass scene=<name>."}
     # SPEC §2: a job must carry the whole decision, not a subset. The engine refuses a
     # partial job before rendering, which is why every run used to fail with no reason.
     job = {
@@ -185,7 +190,7 @@ def render(p):
     res = rt.render(job, OUT)
     if not res.get("ok"):
         return {"ok": False, "error": res.get("error") or "render failed", "log": res.get("log", "")[-1500:]}
-    good, msg = engine.verify_video(res["out"], p["seconds"])
+    good, msg = engine.verify_video(res["out"], p["seconds"], p["voice"])
     return {"ok": good, "out": res.get("out"), "guard": msg, "error": None if good else msg}
 
 def voiceover(p):

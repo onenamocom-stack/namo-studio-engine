@@ -1,0 +1,26 @@
+{
+  "name": "namo-rd",
+  "private": true,
+  "type": "module",
+  "description": "NAMO explainers on rendiv (React video, CPU render)",
+  "scripts": {
+    "render": "node render.mjs"
+  },
+  "dependencies": {
+    "@fontsource/inter": "^5.3.0",
+    "@fontsource/jetbrains-mono": "^5.3.0",
+    "@fontsource/noto-sans-devanagari": "^5.3.0",
+    "@fontsource/noto-serif-devanagari": "^5.3.0",
+    "@rendiv/bundler": "^0.2.6",
+    "@rendiv/core": "^0.2.6",
+    "@rendiv/renderer": "^0.2.6",
+    "@vitejs/plugin-react": "^4.7.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "vite": "^6.4.5"
+  },
+  "allowScripts": {
+    "ffmpeg-static@5.3.0": true,
+    "esbuild@0.25.12": true
+  }
+}

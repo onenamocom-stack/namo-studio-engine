@@ -4,6 +4,12 @@
   {
    "id": "gita-ep01",
    "prompt": "gita chapter 1 shloka 1 episode 1, 60 seconds"
+  },
+  {
+   "id": "gita-1-1-explained",
+   "prompt": "explain why a blind king's first question matters — Bhagavad Gita 1.1, 75 seconds, in Hindi",
+   "scene": "gita-1-1",
+   "voice": "hi_IN-pratham-medium"
   }
  ]
 }

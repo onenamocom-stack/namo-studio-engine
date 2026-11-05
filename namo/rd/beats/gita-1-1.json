@@ -1,0 +1,273 @@
+{
+ "schema": "namo.beats/1",
+ "kind": "explainer",
+ "title": "गीता 1.1 — एक अंधे राजा का पहला सवाल",
+ "title_en": "Gita 1.1 explained — why a blind king's first question matters",
+ "lang": "hi",
+ "chapters": [
+  {
+   "id": "c1",
+   "title": "सवाल"
+  },
+  {
+   "id": "c2",
+   "title": "कौन, किससे"
+  },
+  {
+   "id": "c3",
+   "title": "एक शब्द"
+  },
+  {
+   "id": "c4",
+   "title": "आगे क्या"
+  },
+  {
+   "id": "c5",
+   "title": "सार"
+  }
+ ],
+ "beats": [
+  {
+   "id": "b01",
+   "t": 0.0,
+   "dur": 6.1,
+   "chapter": "c1",
+   "type": "title",
+   "overline": "भगवद् गीता · अध्याय 1 · श्लोक 1",
+   "lines": [
+    "एक अंधे राजा का",
+    "पहला सवाल"
+   ],
+   "emph": {
+    "पहला": "cyan",
+    "सवाल": "cyan"
+   },
+   "sub": "Bhagavad Gita 1.1",
+   "caption": "Gita 1.1 — why a blind king's first question matters",
+   "vo": "गीता उपदेश से शुरू नहीं होती। वो शुरू होती है, एक अंधे राजा के सवाल से।",
+   "mark": "1.1"
+  },
+  {
+   "id": "b02",
+   "t": 6.1,
+   "dur": 8.15,
+   "chapter": "c1",
+   "type": "kinetic",
+   "serif": true,
+   "overline": "श्लोक 1.1 · धृतराष्ट्र उवाच",
+   "lines": [
+    "धर्मक्षेत्रे कुरुक्षेत्रे",
+    "समवेता युयुत्सवः ।",
+    "मामकाः पाण्डवाश्चैव",
+    "किमकुर्वत सञ्जय ॥"
+   ],
+   "emph": {
+    "धर्मक्षेत्रे": "amber",
+    "मामकाः": "red",
+    "पाण्डवाश्चैव": "cyan"
+   },
+   "note": "dharma-kṣetre kuru-kṣetre samavetā yuyutsavaḥ · māmakāḥ pāṇḍavāś caiva kim akurvata sañjaya",
+   "caption": "“At Kurukshetra, the field of dharma — what did my sons and Pandu's sons do, Sanjaya?”",
+   "vo": "धृतराष्ट्र बोले — संजय, धर्मभूमि कुरुक्षेत्र में युद्ध के लिए जुटे, मेरे पुत्रों और पाण्डु के पुत्रों ने क्या किया?"
+  },
+  {
+   "id": "b03",
+   "t": 14.25,
+   "dur": 7.45,
+   "chapter": "c2",
+   "type": "flow",
+   "overline": "यह कहानी कौन सुना रहा है",
+   "nodes": [
+    {
+     "label": "व्यास",
+     "sub": "महर्षि"
+    },
+    {
+     "label": "संजय",
+     "sub": "सारथी और मंत्री"
+    },
+    {
+     "label": "धृतराष्ट्र",
+     "sub": "जन्म से नेत्रहीन राजा"
+    }
+   ],
+   "arrows": [
+    "दिव्य दृष्टि दी",
+    "युद्ध का हाल सुनाया"
+   ],
+   "caption": "Vyasa gave Sanjaya divine sight; Sanjaya narrates the war to the blind king.",
+   "vo": "राजा देख नहीं सकते। तो व्यास ने संजय को दिव्य दृष्टि दी, कि वो युद्ध देखें, और राजा को सुनाएँ।"
+  },
+  {
+   "id": "b04",
+   "t": 21.7,
+   "dur": 6.58,
+   "chapter": "c2",
+   "type": "kinetic",
+   "overline": "पहला शब्द",
+   "lines": [
+    "कुरुक्षेत्र — युद्ध का मैदान",
+    "धर्मक्षेत्र — धर्म की भूमि"
+   ],
+   "emph": {
+    "कुरुक्षेत्र": "cyan",
+    "धर्मक्षेत्र": "amber"
+   },
+   "caption": "He doesn't just say battlefield — his first word is ‘field of dharma’.",
+   "vo": "ध्यान दीजिए, वो इसे सिर्फ़ युद्ध का मैदान नहीं कहते। पहला शब्द है — धर्मक्षेत्र।"
+  },
+  {
+   "id": "b05",
+   "t": 28.28,
+   "dur": 8.05,
+   "chapter": "c3",
+   "type": "map",
+   "overline": "दो भाई, दो परिवार",
+   "nodes": [
+    {
+     "id": "dh",
+     "label": "धृतराष्ट्र",
+     "sub": "बड़े भाई, राजा"
+    },
+    {
+     "id": "pa",
+     "label": "पाण्डु",
+     "sub": "छोटे भाई"
+    },
+    {
+     "id": "ka",
+     "label": "100 कौरव",
+     "sub": "दुर्योधन आदि",
+     "parent": "dh",
+     "tag": "मामकाः · मेरे",
+     "color": "red"
+    },
+    {
+     "id": "pd",
+     "label": "5 पाण्डव",
+     "sub": "युधिष्ठिर, अर्जुन…",
+     "parent": "pa",
+     "tag": "पाण्डवाः · पाण्डु के",
+     "color": "cyan"
+    }
+   ],
+   "links": [
+    {
+     "from": "dh",
+     "to": "pa",
+     "label": "भाई"
+    },
+    {
+     "from": "dh",
+     "to": "pd",
+     "label": "भतीजे भी",
+     "dashed": true
+    }
+   ],
+   "caption": "Both sets of boys are his family — but only one he calls ‘mine’.",
+   "vo": "पाण्डव भी उनका ही परिवार थे। फिर भी राजा कहते हैं — मामकाः, मेरे। और पाण्डवाः, पाण्डु के।"
+  },
+  {
+   "id": "b06",
+   "t": 36.33,
+   "dur": 7.99,
+   "chapter": "c3",
+   "type": "compare",
+   "overline": "मामकाः बनाम पाण्डवाः",
+   "left": {
+    "head": "मामकाः",
+    "sub": "“मेरे बेटे”",
+    "color": "red"
+   },
+   "right": {
+    "head": "पाण्डवाः",
+    "sub": "“पाण्डु के बेटे”",
+    "color": "cyan"
+   },
+   "stamp": "पक्षपात",
+   "caption": "‘Mine’ vs ‘Pandu's’ — one word gives away his partiality.",
+   "vo": "एक वाक्य में अपने और पराए की रेखा खिंच गई। यही मोह, यही पक्षपात, आगे युद्ध की जड़ बनता है।"
+  },
+  {
+   "id": "b07",
+   "t": 44.32,
+   "dur": 6.83,
+   "chapter": "c3",
+   "type": "number",
+   "overline": "अकेला संवाद",
+   "value": 700,
+   "prefix": "1 / ",
+   "color": "amber",
+   "label": "गीता के 700 श्लोकों में से धृतराष्ट्र बोलते हैं सिर्फ़ एक",
+   "sub": "बाकी सब संजय सुनाते हैं",
+   "caption": "Of the Gita's 700 verses, Dhritarashtra speaks only this one.",
+   "vo": "गीता के सात सौ श्लोकों में धृतराष्ट्र बस यही एक बोलते हैं। बाकी सब, संजय सुनाते हैं।"
+  },
+  {
+   "id": "b08",
+   "t": 51.15,
+   "dur": 7.34,
+   "chapter": "c4",
+   "type": "timeline",
+   "overline": "इस सवाल के बाद",
+   "items": [
+    {
+     "k": "1.1",
+     "label": "राजा का सवाल"
+    },
+    {
+     "k": "1.2",
+     "label": "दुर्योधन द्रोण के पास जाता है"
+    },
+    {
+     "k": "1.21",
+     "label": "अर्जुन: रथ दोनों सेनाओं के बीच"
+    },
+    {
+     "k": "1.47",
+     "label": "अर्जुन धनुष रख देते हैं"
+    },
+    {
+     "k": "2.11",
+     "label": "कृष्ण का उपदेश शुरू"
+    }
+   ],
+   "caption": "Sanjaya's answer to this one question becomes the whole Gita.",
+   "vo": "इसी सवाल के जवाब में संजय सुनाते हैं — दुर्योधन, अर्जुन का संशय, और फिर कृष्ण का उपदेश।"
+  },
+  {
+   "id": "b09",
+   "t": 58.49,
+   "dur": 8.28,
+   "chapter": "c4",
+   "type": "kinetic",
+   "overline": "टीकाकारों की नज़र से",
+   "lines": [
+    "सेनाएँ लड़ने ही आई थीं।",
+    "तो पूछा क्यों — ‘क्या किया?’"
+   ],
+   "emph": {
+    "क्यों": "red"
+   },
+   "note": "डर — कहीं धर्म की भूमि बेटों का मन न बदल दे",
+   "caption": "Commentators read fear in it: might the holy ground change his sons' minds?",
+   "vo": "सेनाएँ लड़ने ही आई थीं, फिर भी पूछा — क्या किया? टीकाकार कहते हैं, डर था — कहीं धर्मभूमि बेटों का मन न बदल दे।"
+  },
+  {
+   "id": "b10",
+   "t": 66.77,
+   "dur": 8.23,
+   "chapter": "c5",
+   "type": "recap",
+   "overline": "याद रखिए",
+   "items": [
+    "धर्मक्षेत्र — युद्ध का मैदान भी, धर्म की परीक्षा भी",
+    "मामकाः बनाम पाण्डवाः — मोह से जन्मा पक्षपात",
+    "संजय — व्यास की दी दिव्य दृष्टि से देखा हाल"
+   ],
+   "footer": "अगला: श्लोक 1.2 →",
+   "caption": "Field of dharma · ‘mine’ vs ‘theirs’ · Sanjaya's divine sight. Next: verse 1.2",
+   "vo": "याद रखिए — धर्मक्षेत्र, मामकाः बनाम पाण्डवाः, और संजय की दिव्य दृष्टि। अगला — श्लोक 1.2।"
+  }
+ ]
+}

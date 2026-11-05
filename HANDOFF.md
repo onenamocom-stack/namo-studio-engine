@@ -15,7 +15,7 @@ One line in, one video out.
 
 ```
 brief text -> namo/agent.py (router, deterministic) -> plan
-plan       -> namo/engine.py (runtime: mg | h3)      -> film or stems
+plan       -> namo/engine.py (runtime: mg | rd | h3) -> film or stems
 film       -> namo/engine.py verify_video()          -> accept or reject
 queue      -> namo/factory.py                        -> runs all of the above, unattended
 ```
@@ -92,8 +92,10 @@ Built 6 Nov (laptop OMP, after the phone went offline):
 - Explainer `beat-director` skill written; the explainer pipeline passes `check_pipeline`.
 
 Not built (the actual backlog):
-- **Explainer runtime**: the owner rejected the lemo ink look for explainers ("nowhere near Codacus").
-  The explainer moves to `thecodacus/rendiv` (`namo/rd/`, in progress).
+- **Explainer runtime `rd`** (6 Nov): rendiv (`namo/rd/`, `@rendiv/*` 0.2.6 from npm), data-driven beats
+  (`namo/rd/beats/*.json`), style measured from three Codacus videos (`namo/rd/STYLE.md`), piper voice,
+  `engine.py fitbeats` fits narration to beats. Still short of Codacus: no sfx, no illustrated/3D scenes,
+  reveals not synced to spoken words.
 - The 17 webshow/customer skills exist (6 Nov) but the two yamls disagree with namo-studio ep01 v2 in 9
   places (5 s clips vs 7.3 s shots, 480x864 vs 768x1344 stems, piper vs Chirp3-HD voices, a mandatory ink
   shot, deleted `namo_gpu.py`/`PROVISIONING_RULES.json`, missing playbooks, teal vs "NO teal-orange", no
@@ -141,9 +143,8 @@ Key: `zafiro-local-key` (in `cpa/config8322.yaml`).
 - **`ft-motion` alone, `lemo` alone, `stillmotion`, `html-to-video-skill`.** `ft-motion` is the
   superset (it vendors lemo and adds the animation kit). The other two are minimal or
   redundant.
-- **`thecodacus/rendiv`** — genuinely the tool behind the reference video's *style*, React +
-  `useFrame()`, Apache-2.0, 22 packages. Not yet adopted; it is a candidate to replace `mg`
-  later, not a fix for today.
+- **`thecodacus/rendiv`** — the tool behind the reference video's *style*, React + `useFrame()`,
+  Apache-2.0. **Adopted 6 Nov as runtime `rd` for explainers**; `mg` stays for the ink-wash webshow cards.
 - **OpenMontage (AGPL)** is the base for the 13 pipelines and 157 skills. The fork is
   `namo-studio-engine`.
 
@@ -166,7 +167,7 @@ Key: `zafiro-local-key` (in `cpa/config8322.yaml`).
 
 ## 8. Immediate next steps, in order
 
-1. Explainer on rendiv at the Codacus bar, wired as a runtime with the same job/verify contract.
+1. Explainer polish: sfx on reveals, reveals synced to word timings, illustrated scenes.
 2. Bring `namo-webshow.yaml` / `namo-customer.yaml` in line with namo-studio ep01 v2 (see §4).
 3. Add the pipeline loader that calls `check_pipeline()`.
 4. Restore R2 publish with fresh credentials.
