@@ -275,9 +275,15 @@ class MgRuntime(Runtime):
         if out.exists():
             out.unlink()            # SPEC §4 / O3: a stale file never satisfies a run
 
-        work = Path(tempfile.mkdtemp(prefix="namo-mg-"))
+        # lemo resolves `films/<scene>` relative to its own cwd, so the scene has to live
+        # inside the engine dir. Use a unique name so parallel jobs cannot collide (D11),
+        # and remove it afterwards.
+        tag = "%s-%s" % (sanitise_name(job["name"]), os.getpid())
+        film = d / "films" / tag
+        work = film
         try:
-            film = work / "films" / job["scene"]
+            if film.exists():
+                shutil.rmtree(film, ignore_errors=True)
             film.parent.mkdir(parents=True, exist_ok=True)
             shutil.copytree(SCENES / job["scene"], film)
             css = NAMO / "mg" / "fonts.css"
@@ -307,7 +313,7 @@ class MgRuntime(Runtime):
             ])
             env = {**os.environ, "PLAYWRIGHT_CHROME": chromium(),
                    "NAMO_JOB": json.dumps(job)}
-            cmd = ["node", "core/render/video.mjs", "films/" + job["scene"],
+            cmd = ["node", "core/render/video.mjs", "films/" + tag,
                    "--fps", str(int(job["fps"])),
                    "--workers", str(int(job.get("workers", 4))),
                    "--q", qs,
