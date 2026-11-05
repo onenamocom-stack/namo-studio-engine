@@ -1,0 +1,110 @@
+{
+ "ep01": {
+  "01": [
+   {
+    "name": "wind_dry_grass",
+    "t": 0,
+    "gain_db": -18,
+    "gen": "anoisesrc=color=brown:amplitude=0.03:duration=8,highpass=f=200,lowpass=f=2000"
+   },
+   {
+    "name": "conch_distant",
+    "t": 4,
+    "gain_db": -24,
+    "gen": "sine=frequency=220:duration=3,tremolo=f=0.4:d=0.6"
+   }
+  ],
+  "02": [
+   {
+    "name": "hooves_dry",
+    "t": 0,
+    "gain_db": -14,
+    "gen": "anoisesrc=color=white:amplitude=0.12:duration=2,tremolo=f=6:d=0.9,lowpass=f=900"
+   },
+   {
+    "name": "breath",
+    "t": 3,
+    "gain_db": -20,
+    "gen": "anoisesrc=color=pink:amplitude=0.05:duration=3,highpass=f=400,lowpass=f=1500"
+   }
+  ],
+  "03": [
+   {
+    "name": "lamp_crackle",
+    "t": 0,
+    "gain_db": -22,
+    "gen": "anoisesrc=color=white:amplitude=0.04:duration=7,highpass=f=2500,lowpass=f=6000,tremolo=f=3:d=0.8"
+   },
+   {
+    "name": "cloth_move",
+    "t": 4,
+    "gain_db": -24,
+    "gen": "anoisesrc=color=pink:amplitude=0.03:duration=3,highpass=f=800"
+   }
+  ],
+  "04": [
+   {
+    "name": "hall_tone",
+    "t": 0,
+    "gain_db": -26,
+    "gen": "anoisesrc=color=brown:amplitude=0.02:duration=7"
+   }
+  ],
+  "05": [
+   {
+    "name": "massed_roar",
+    "t": 0,
+    "gain_db": -10,
+    "gen": "anoisesrc=color=brown:amplitude=0.35:duration=3,lowpass=f=1200"
+   },
+   {
+    "name": "metal_shimmer",
+    "t": 2,
+    "gain_db": -18,
+    "gen": "anoisesrc=color=white:amplitude=0.08:duration=4,highpass=f=3000"
+   }
+  ],
+  "06": [
+   {
+    "name": "lamp_low",
+    "t": 0,
+    "gain_db": -26,
+    "gen": "anoisesrc=color=brown:amplitude=0.015:duration=8"
+   },
+   {
+    "name": "single_breath",
+    "t": 6,
+    "gain_db": -24,
+    "gen": "anoisesrc=color=pink:amplitude=0.04:duration=2,highpass=f=300"
+   }
+  ],
+  "07": [
+   {
+    "name": "wind_flat",
+    "t": 0,
+    "gain_db": -20,
+    "gen": "anoisesrc=color=brown:amplitude=0.025:duration=7,lowpass=f=800"
+   },
+   {
+    "name": "drums_far",
+    "t": 2,
+    "gain_db": -26,
+    "gen": "sine=frequency=60:duration=4,tremolo=f=1.5:d=0.9"
+   }
+  ],
+  "08": [
+   {
+    "name": "conch_answered",
+    "t": 0,
+    "gain_db": -16,
+    "gen": "sine=frequency=294:duration=3,tremolo=f=0.3:d=0.5"
+   },
+   {
+    "name": "hooves_mass",
+    "t": 3,
+    "gain_db": -16,
+    "gen": "anoisesrc=color=white:amplitude=0.15:duration=4,tremolo=f=8:d=0.9,lowpass=f=700"
+   }
+  ]
+ }
+}
