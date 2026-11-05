@@ -81,7 +81,10 @@ jobs:
           ls -la .voices
 
       - name: probe
-        run: python3 namo/engine.py probe || true
+        # one runtime may FAIL on CI (missing key) and jobs needing it are refused; none registered = nothing can render
+        run: |
+          python3 namo/engine.py probe | tee probe.txt
+          if grep -q '^REGISTRY: empty' probe.txt; then echo "::error::probe: no runtime registered"; exit 1; fi
 
       - name: pipeline gate (P1)
         run: |
@@ -89,7 +92,8 @@ jobs:
           for y in pipeline_defs/namo-*.yaml; do
             python3 namo/engine.py pipeline "$y" || fail=1
           done
-          echo "P1 gate: $([ $fail -eq 0 ] && echo pass || echo 'open drift (D1-D3)')"
+          echo "P1 gate: $([ $fail -eq 0 ] && echo pass || echo FAIL)"
+          exit $fail
 
       - name: run the factory
         run: python3 namo/factory.py --once ${{ inputs.dry == '1' && '--dry' || '' }}
@@ -107,7 +111,7 @@ jobs:
           cp status.json status_history/$(date -u +%Y%m%dT%H%M%SZ).json 2>/dev/null || true
           git add status.json status_history 2>/dev/null || true
           git diff --staged --quiet || git commit -m "factory: $(date -u +%Y-%m-%dT%H:%MZ)"
-          git push || echo "push skipped"
+          git push || { git pull --rebase && git push; }
 
       - uses: actions/upload-artifact@v4
         if: always()

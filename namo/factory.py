@@ -9,7 +9,7 @@ No human in the loop for routine work. The factory:
   4. renders what it can      (engine registry only)
   5. verifies pixels          (a blank film is a failure, not an output)
   6. records what happened    (status.json)
-  7. refuses loudly           (infeasible => BLOCKED, with the exact reason)
+  7. refuses loudly           (infeasible => BLOCKED, with the exact reason; exit 1 if any job BLOCKED/FAILED/CRASHED)
 
 A failure is recorded with its cause instead of being found by a human three days later.
 
@@ -95,7 +95,7 @@ def once(dry=False):
     for r in st["runs"]: counts[r["state"]] = counts.get(r["state"],0)+1
     print("factory:", counts)
     last = st["runs"][-len(todo):]
-    return 0 if not any(r["state"] in ("FAILED","CRASHED") for r in last) else 1
+    return 0 if not any(r["state"] in ("BLOCKED","FAILED","CRASHED") for r in last) else 1
 
 def status():
     st = load(STATUS, {"runs": []})

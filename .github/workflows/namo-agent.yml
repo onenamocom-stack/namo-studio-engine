@@ -82,7 +82,10 @@ jobs:
           python3 -m piper.download_voices --data-dir .voices hi_IN-pratham-medium en_US-lessac-medium
 
       - name: engine probe
-        run: python3 namo/engine.py probe || true
+        # as factory.yml: one runtime may FAIL on CI; none registered = nothing can render
+        run: |
+          python3 namo/engine.py probe | tee probe.txt
+          if grep -q '^REGISTRY: empty' probe.txt; then echo "::error::probe: no runtime registered"; exit 1; fi
 
       - name: decide
         id: decide
@@ -94,8 +97,8 @@ jobs:
           IN="$P"
           [ -n "$S" ] && IN="$IN $S seconds"
           [ -n "$R" ] && IN="$IN $R"
-          python3 namo/agent.py --dry "$IN" | tee out_plan.json || true
-          python3 namo/agent.py --dry "$IN" > brief.json 2>/dev/null || cp out_plan.json brief.json
+          set -o pipefail
+          python3 namo/agent.py --dry "$IN" | tee out_plan.json
 
       - name: make the video
         if: github.event.inputs.dry != '1'

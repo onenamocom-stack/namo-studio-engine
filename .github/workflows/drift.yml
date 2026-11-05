@@ -3,6 +3,8 @@ name: drift
 on:
   push:
   workflow_dispatch:
+permissions:
+  contents: read
 jobs:
   drift:
     runs-on: ubuntu-latest
