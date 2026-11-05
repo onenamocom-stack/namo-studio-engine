@@ -1,0 +1,119 @@
+# NAMO — webshow episode (Mahabharata / Gita). The show that already exists.
+# Inherits the animated-explainer contract, but every visual and audio stage is pinned to
+# NAMO's own contract files (SHOW_BIBLE, GPU_CONTRACT, PROVISIONING_RULES) so the
+# engine never wanders into a generic "AI explainer" look.
+name: namo-webshow
+version: "1.0"
+description: >
+  A NAMO episode: one shloka, one chapter, one 60-second film. Research is the DCS corpus,
+  not the web. Visuals come from the show bible (late Vedic Iron Age, fire-lit, ochre/teal),
+  never from a generic style prompt. GPU is outsourced and returns raw stems; CPU composes.
+category: show
+stability: production
+
+inherits: animated-explainer
+
+# ---- authority: these files win over any playbook ----
+contracts:
+  bible: manufacture/SHOW_BIBLE.json
+  gpu: manufacture/GPU_CONTRACT.json
+  provisioning: manufacture/PROVISIONING_RULES.json
+  corpus: corpus/mahabharatam.txt          # DCS, CC-BY 4.0, fetched by the workflow
+  episode_dir: show/{ep}/
+  shots: show/{ep}/shots.json              # the shot list is authored, not generated
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/namo/showrunner
+  budget_default_usd: 1.50
+  max_revisions_per_stage: 2
+  max_wall_time_minutes: 45
+
+compatible_playbooks:
+  recommended:
+    - namo-vedic-ink          # mg/storyboard ink-wash
+    - namo-vedic-painted      # H3 2.5D painted plates
+  custom_allowed: false       # the show has ONE look. Do not let a run invent another.
+
+stages:
+  - name: research
+    skill: pipelines/namo/corpus-director
+    tools_available: []
+    produces: [research_brief]
+    note: >
+      Research is DCS word frequency + the chapter's own Sanskrit, not YouTube/Reddit.
+      Every claim must cite a verse.
+    success_criteria:
+      - Devanagari + IAST + chhanda for the shloka, verified against DCS
+      - At least 5 lemmas measured in DCS with counts
+      - Location and era confirmed against SHOW_BIBLE.world
+
+  - name: script
+    skill: pipelines/namo/script-director
+    required_artifacts_in: [research_brief]
+    produces: [script]
+    note: >
+      Dhritarashtra Uvacha is a QUESTION. The episode must end unresolved. No moral,
+      no summary, no "and so we learn". 60 seconds, 5 subtitle cues, one speaker per line.
+    success_criteria:
+      - Devanagari subtitles split to fit 52px at 1920 width
+      - Voice is piper hi_IN-pratham-medium, one line per shot
+      - Speech fits within each beat with 0.3 s air (PRE14)
+
+  - name: scene_plan
+    skill: pipelines/namo/scene-director
+    required_artifacts_in: [script]
+    produces: [scene_plan]
+    note: >
+      Reads show/{ep}/shots.json — the author's shot list. It may NOT add or remove shots;
+      it assigns each shot to a runtime and a style.
+    runtimes:
+      mg:     ink-wash vector (lemo engine, CPU, ~0.04 s/frame)
+      h3:     MiniMax H3 image-to-video (GPU, outsourced, 5 s clips)
+      plate:  still image + 2.5D camera move (CPU)
+    success_criteria:
+      - Every shot in shots.json has a runtime assigned
+      - At least one ink-wash shot per episode (the show's spine)
+      - No shot exceeds its runtime's max duration
+
+  - name: assets
+    skill: pipelines/namo/asset-director
+    required_artifacts_in: [scene_plan, script]
+    produces: [asset_manifest]
+    tools_available: [tts_selector, image_selector, video_selector, music_gen]
+    note: >
+      GPU work is dispatched through manufacture/namo_gpu.py under PROVISIONING_RULES.
+      A pod is born only when it will boot and dies the moment it will not.
+      CPU work (mg render, voice, mix) runs here on the runner.
+    success_criteria:
+      - Every stem matches GPU_CONTRACT.gpu_outputs exactly (480x864, h264, 24fps)
+      - SHA256SUMS present and verified
+      - No pod left alive after the stage
+      - mg shots rendered by the lemo engine, YAVG checked (not just "file exists")
+
+  - name: edit
+    skill: pipelines/namo/edit-director
+    required_artifacts_in: [scene_plan, asset_manifest]
+    produces: [edit_decisions]
+    note: Shot order comes from shots.json. Transitions are ink-blooms, not dissolves.
+
+  - name: compose
+    skill: pipelines/namo/compose-director
+    required_artifacts_in: [edit_decisions, asset_manifest]
+    produces: [render_report, final_review]
+    required_tools: [video_compose, audio_mixer]
+    note: |
+      CPU only. -16 LUFS, h264, subtitles burned as Devanagari in the liubai.
+      The render is rejected if any frame is flat black (YAVG variance check).
+    success_criteria:
+      - ffprobe duration within 5% of target_seconds
+      - Zero all-black frames
+      - Audio -16 LUFS +/- 1
+      - Subtitles present and legible at 52px
+
+  - name: publish
+    skill: pipelines/namo/publish-director
+    required_artifacts_in: [render_report, final_review]
+    produces: [publish_log]
+    tools_available: [export_bundle]
+    note: Pipeline ENDS AT APPROVED. The owner does not publish from here.
