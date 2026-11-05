@@ -1,0 +1,20 @@
+{
+ "name": "namo-gita-1-1",
+ "width": 1920,
+ "height": 1080,
+ "fps": 24,
+ "duration": 60,
+ "bpm": 90,
+ "speed": 1,
+ "subframes": 4,
+ "fonts": {
+  "css": [
+   "/core/fonts/fonts.css"
+  ],
+  "preload": [
+   "600 40px CormorantSC",
+   "500 40px Cormorant",
+   "40px MaShanZheng"
+  ]
+ }
+}
