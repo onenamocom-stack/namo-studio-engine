@@ -1,0 +1,84 @@
+{
+ "show": "NAMO — Mahabharata",
+ "version": 2,
+ "principle": "This bible is derived from the corpus, not from imagination. Every visual choice cites a word frequency measured in DCS Mahabharata (1,055,243 annotated words).",
+ "evidence": {
+  "vana": 1250,
+  "agni": 1222,
+  "aSva": 1109,
+  "yajYa": 997,
+  "pArTiva": 937,
+  "rAjya": 828,
+  "senA": 610,
+  "parvata": 542,
+  "Dvaja": 526,
+  "ratna": 374,
+  "sAgara": 348,
+  "AyuDa": 319,
+  "nagara": 284,
+  "kavaca": 252,
+  "hasti": 180,
+  "vastra": 157,
+  "antaHpura": 60,
+  "pIWa": 17
+ },
+ "world": "A yajña-centred, horse-riding, forest-and-hill world of the late Vedic Kuru kingdom. NOT a Mughal court, NOT a Rajput fort, NOT a temple town. Fire is the constant: every hall has a sacred fire, every camp has a fire trench, the battlefield is smoke and dust.",
+ "era": "Late Vedic Iron Age, c. 900 BCE, Kuru heartland of Haryana-Doab. Red-brown alluvial brick, timber, thatch over brick. No stone temples in use yet.",
+ "architecture": {
+  "palace": "burnt-brick walls, thick, unplastered in places; timber columns with plain lotus capitals; flat roof with brick parapet; open inner courtyard with a sacred fire pit (homa-kunda) as the visual centre of every hall",
+  "city": "Hastinapur: mud-brick rampart, timber gate, wide unpaved street, elephant stables, chariot yards, ashvashala",
+  "camp": "tents of dyed cloth, chariot park, fire trenches, banner poles",
+  "temple": "NO temple. Fire-altar and yajna-shala instead",
+  "banned": "domes, arches, minarets, jali, marble inlay, sculpted temple gopuram, colonial anything"
+ },
+ "materials": {
+  "fabric": "handwoven kshauma (linen), coarse dukula (silk), ajina (deerskin), valkala (bark cloth), uttariya (upper cloth), wool shawl; madder red, indigo, ochre, undyed cream",
+  "metal": "iron, dull bronze, brass; gold only as beaten-leaf on ritual objects and as jewellery",
+  "wood": "sal and teak, iron-banded chariot, cane and hide",
+  "no": "machine stitching, zippers, synthetic sheen, polished chrome, glass, plastic",
+  "vocabulary_source": "EVIDENCE.clothing - only words the corpus attests. 'cotton' and 'saree' are NOT corpus words and are banned."
+ },
+ "props": {
+  "fire": "clay homa-kunda, brass samai, terracotta lamp, camphor flame - the signature object of the show",
+  "ritual": "wooden palasha ladle, camphor, kusha grass, kalasha pot, ghee",
+  "war": "iron-bound chariot with spoked wheels and a tall dvaja, cane shield, leather kavaca with bronze scales, iron sword, bamboo bow, quiver",
+  "royal": "low wooden throne with carved lotus base, umbrella (chatra), yak-tail chowri, betel tray, dice board",
+  "animal": "horses with braided manes and copper ornaments, elephants with dyed forehead cloth"
+ },
+ "photography": {
+  "camera": "ARRI Alexa 35",
+  "lens": "65mm Zeiss Supreme",
+  "aperture": "T2.8",
+  "shutter": "1/48s",
+  "stock": "Kodak Vision3 500T",
+  "grade": "warm amber, deep brown shadow, dust-saturated, desaturated green, NO teal-orange",
+  "grain": "fine 35mm grain"
+ },
+ "light_logic": {
+  "interior": "sacred fire or oil lamp only - one warm source, deep falloff, faces half-lit, smoke visible",
+  "exterior": "hard sun, dust in beams, no fill beyond sand bounce",
+  "rule": "never cool daylight indoors; never a light without a visible source in frame; if there is no fire in the scene, the scene is cold and pale"
+ },
+ "negative_prompt": "no Mughal architecture, no domes, no arches, no minarets, no jali screens, no marble inlay, no temple gopuram, no colonial clothing, no modern fabric, no synthetic fibres, no plastic, no zippers, no machine stitching, no bright polished gold, no neon, no teal-orange grade, no cartoon, no illustration, no 3D render, no CGI look, no perfect skin, no makeup, no styled hair, no Bollywood poster look, no text, no watermark, no moody blue night",
+ "casting_rule": "No character is ever generated from its own prompt alone. Every prompt = this bible + the character identity + framing.",
+ "per_shot_rule": "Every shot prompt must name the visible light source, the props present, and the ground material. If it names none, the shot is invalid.",
+ "banners": {
+  "rule": "every chariot carries the banner the text assigns. Never invent an emblem.",
+  "evidence": {
+   "arjuna": "vanara (monkey/Hanuman) - M.6.22.10 kapi-dhvaja, M.5.140.3 vanara-raja",
+   "bhishma": "all white - white umbrella, white bow, white horses, white banner - M.6.20.9",
+   "ashvatthama": "lion-tail (simha-langula) - M.7.80.10",
+   "yudhishthira": "the corpus names no emblem for him in these verses - use a plain white and dull-gold banner. A lion is FORBIDDEN (verified absent from his banner verses)."
+  },
+  "forbidden": {
+   "yudhishthira": [
+    "lion",
+    "simha"
+   ],
+   "reason": "not attested in the searched verses"
+  }
+ },
+ "corrections": {
+  "yudhishthira_banner": "previous sheet showed a lion - not supported by the verses searched. Replaced with plain white-gold."
+ }
+}
