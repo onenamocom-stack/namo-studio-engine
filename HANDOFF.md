@@ -94,7 +94,10 @@ Built 6 Nov (laptop OMP, after the phone went offline):
 Not built (the actual backlog):
 - **Explainer runtime**: the owner rejected the lemo ink look for explainers ("nowhere near Codacus").
   The explainer moves to `thecodacus/rendiv` (`namo/rd/`, in progress).
-- 17 skill files referenced by `namo-webshow` and `namo-customer` do not exist (D1–D2).
+- The 17 webshow/customer skills exist (6 Nov) but the two yamls disagree with namo-studio ep01 v2 in 9
+  places (5 s clips vs 7.3 s shots, 480x864 vs 768x1344 stems, piper vs Chirp3-HD voices, a mandatory ink
+  shot, deleted `namo_gpu.py`/`PROVISIONING_RULES.json`, missing playbooks, teal vs "NO teal-orange", no
+  `plate` runtime). The yamls must be brought to v2 before the webshow pipeline drives H3.
 - No pipeline loader: nothing reads `pipeline_defs/*.yaml` at runtime.
 - R2 publish needs working credentials (`R2_AK/R2_SK/R2_EP` in repo secrets).
 
@@ -164,6 +167,6 @@ Key: `zafiro-local-key` (in `cpa/config8322.yaml`).
 ## 8. Immediate next steps, in order
 
 1. Explainer on rendiv at the Codacus bar, wired as a runtime with the same job/verify contract.
-2. Write the 17 missing webshow/customer skill files (or cut the pipelines down to what exists).
+2. Bring `namo-webshow.yaml` / `namo-customer.yaml` in line with namo-studio ep01 v2 (see §4).
 3. Add the pipeline loader that calls `check_pipeline()`.
 4. Restore R2 publish with fresh credentials.

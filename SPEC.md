@@ -174,13 +174,13 @@ success.
 
 | # | where | what | severity |
 |---|---|---|---|
-| D1 | `namo-webshow.yaml` | 8 skill paths missing | blocks the pipeline |
-| D2 | `namo-customer.yaml` | 9 skill paths missing | blocks the pipeline |
-| D3 | `namo-explainer.yaml` | `pipelines/namo/beat-director` missing | blocks that stage |
+| D1 | `namo-webshow.yaml` | **closed 6 Nov**: the 8 skills exist under `skills/pipelines/namo/` | closed |
+| D2 | `namo-customer.yaml` | **closed 6 Nov**: the 9 skills exist under `skills/pipelines/customer/` | closed |
+| D3 | `namo-explainer.yaml` | **closed 6 Nov**: `pipelines/explainer/beat-director` written, stage repointed | closed |
 | D4 | `agent.py` | a brief with no authored scene is refused rather than mis-rendered — honest, but no film | blocks non-webshow |
 | D5 | R2 creds | keys return 401 | publish blocked |
 | D6a | `mg` renderer | **closed**: the plan reaches the page (`--q`, `--size`, `render.json`); §4 judges the result. Delivery is guaranteed. | closed |
-| D6b | `mg` scenes | **open**: no scene yet reads `location.search`, so every brief still renders at the scene's authored length and is then rejected by §4. Fix is per-scene, not in the engine. | blocks non-matching briefs |
+| D6b | `mg` scenes | **closed 6 Nov for `gita-ep01`**: the scene reads `seconds` (20–180) and `ratio` from `location.search`. A new scene must do the same before it sets `applicable: true`. | closed |
 | D7 | pipelines | no loader exists, so P1 is checked only when called by hand | blocks P1 enforcement |
 
 D6 is the one that matters most: the router decides, and the renderer ignores the decision.
