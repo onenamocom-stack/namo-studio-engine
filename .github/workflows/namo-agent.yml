@@ -23,10 +23,14 @@ jobs:
         with: {python-version: "3.11"}
 
       - name: system deps
+        # the runner image already carries Google Chrome — an apt install of chromium
+        # drags in snap and costs ~5 minutes on every single run. Use what is there.
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq ffmpeg chromium-browser || sudo apt-get install -y -qq chromium
-          echo "PLAYWRIGHT_CHROME=$(command -v chromium || command -v chromium-browser)" >> $GITHUB_ENV
+          sudo apt-get install -y -qq ffmpeg
+          CH=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)
+          echo "PLAYWRIGHT_CHROME=$CH" >> $GITHUB_ENV
+          echo "using chrome: $CH"
+          "$CH" --version || true
 
       - name: cache engines
         uses: actions/cache@v4
