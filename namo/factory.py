@@ -62,7 +62,7 @@ def run_job(job):
         rec.update(state="CRASHED", reason="%s: %s" % (type(e).__name__, str(e)[:400]),
                    trace=traceback.format_exc()[-1400:], seconds=round(time.time()-t0, 1))
         return rec
-    if res.get("ok"): rec.update(state="DONE", out=res["out"], guard=res["guard"])
+    if res.get("ok"): rec.update(state="DONE", out=res["out"], guard=res["guard"], audio=res.get("audio"))
     else: rec.update(state="FAILED", reason=res.get("error"), cmd=res.get("cmd"), cwd=res.get("cwd"),
                    log=(res.get("log") or "")[-1500:])
     rec["seconds"] = round(time.time()-t0, 1)

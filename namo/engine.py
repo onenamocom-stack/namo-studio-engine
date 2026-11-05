@@ -16,7 +16,7 @@ Design rule taken from the spec, section 6: a runtime that cannot honour the bri
 refuse the job. A film that silently ignores the brief is worse than no film, because it
 looks like success.
 """
-import json, math, os, re, shutil, subprocess, sys, tempfile, wave
+import base64, json, math, os, re, shutil, subprocess, sys, tempfile, urllib.error, urllib.request, wave
 from pathlib import Path
 
 NAMO = Path(__file__).resolve().parent
@@ -51,12 +51,41 @@ SIZE_FOR_RATIO = {
 BLANK_RATIO = 0.0          # SPEC §4: blank frames <= 0 %
 SILENT_MEAN_DB = -50.0     # SPEC §4: an audio track whose mean volume is below this is silence
 
-# voice: piper models live here (factory.yml caches it); a line may be sped up to fit its
-# slot by at most ATEMPO_MAX, beyond that the job fails - never overlap, never truncate
+# voice: a job names its engine and id (SPEC §2). piper models live in VOICES (factory.yml caches
+# it); chirp3 is Google Cloud TTS Chirp3-HD, authenticated by `gcloud auth print-access-token`
+# (laptop: user login; Actions: keyless WIF as the TTS-only service account). A line may be sped
+# up to fit its slot by at most ATEMPO_MAX; beyond that the job fails - never overlap, never truncate.
 VOICES = ROOT / ".voices"
-DEFAULT_VOICE = "hi_IN-pratham-medium"
+DEFAULT_VOICE = {"engine": "chirp3", "id": "hi-IN-Chirp3-HD-Kore"}   # probe + fitbeats default
 ATEMPO_MAX = 1.15
-VOICE_ID = re.compile(r"[a-z]{2,3}_[A-Z]{2}-\w+-\w+")      # piper's <lang>_<REGION>-<name>-<quality>
+VOICE_ID = {
+    "piper": re.compile(r"[a-z]{2,3}_[A-Z]{2}-\w+-\w+"),           # <lang>_<REGION>-<name>-<quality>
+    "chirp3": re.compile(r"[a-z]{2,3}-[A-Z]{2}-Chirp3-HD-[A-Z][a-z]+"),  # <lang>-<REGION>-Chirp3-HD-<Name>
+}
+TTS_URL = "https://texttospeech.googleapis.com/v1/text:synthesize"
+TTS_PROJECT = "project-5e5df107-b8f8-4649-9d1"     # quota project, as namo-studio namo_audio.py
+SR = 48000
+# TTS pads both ends with silence; strip it so a line's length is its speech (namo_audio.fit)
+EDGE_STRIP = ("silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
+              "silenceremove=start_periods=1:start_threshold=-50dB,areverse")
+
+# mastering (compose stage, every runtime): voice chain, optional ducked bed, then gain + a 4x
+# oversampled limiter (not loudnorm: over its LRA/TP limits it drops to dynamic mode and misses I).
+# The gain is set on the voice alone: in a speech-sparse film (gita-ep01, ~13 % speech) the bed in
+# the pauses passes the R128 relative gate and pulls the film's integrated loudness ~5 LU under the
+# speech; chasing -16 on the whole film then cost ~8 dB of limiting on the voice. With dense narration
+# (explainers) film and speech loudness are the same. AAC overshoots the PCM peak, so the encoded film
+# is measured and re-limited once.
+LUFS = -16.0            # speech loudness (R128 integrated of the mastered voice), mobile-first
+TP_MAX = -1.5           # dBTP, measured on the encoded film
+TP_CEIL = -2.5          # limiter ceiling before AAC (namo_studio measured +1.2 dB AAC overshoot)
+VOICE_CHAIN = ("highpass=f=80,"
+               "deesser=i=0.3:m=0.5:f=0.5,"
+               "acompressor=threshold=-21dB:ratio=2.5:attack=8:release=150:knee=3,"
+               "equalizer=f=3000:t=q:w=1:g=2")
+BEDS = NAMO / "audio"   # <name>.flac seamless loops; job.bed names one
+BED_UNDER_VOICE_DB = 22  # bed level under speech, after ducking
+BED_DUCK_DB = 6          # how far the bed drops while the voice speaks (it swells back in the pauses)
 
 
 def which(*names):
@@ -117,6 +146,14 @@ def validate_job(job):
     voice = job["voice"]
     if not isinstance(voice, dict) or not voice.get("engine") or not voice.get("id"):
         return False, "job.voice must be an object with engine and id"
+    if voice["engine"] not in VOICE_ID or not isinstance(voice["id"], str) \
+            or not VOICE_ID[voice["engine"]].fullmatch(voice["id"]):
+        return False, "job.voice %r: engine must be one of %s, with an id of that engine" % (voice, ", ".join(VOICE_ID))
+
+    bed = job.get("bed")
+    if bed is not None and not (isinstance(bed, str) and re.fullmatch(r"[\w-]+", bed) and (BEDS / (bed + ".flac")).exists()):
+        return False, "job.bed must name a namo/audio/<bed>.flac, got %r (have: %s)" % (
+            bed, ", ".join(sorted(p.stem for p in BEDS.glob("*.flac"))) or "none")
 
     # SPEC §2: name is sanitised, not rejected. The caller keeps its own copy in the job.
     name = sanitise_name(job["name"])
@@ -166,8 +203,6 @@ def page_vo(d, film, qs, ratio):
 
 def voice_model(vid):
     """(model path, err). Fetches the piper model into VOICES when it is not there yet."""
-    if not isinstance(vid, str) or not VOICE_ID.fullmatch(vid):
-        return None, "voice id %r is not a piper voice (<lang>_<REGION>-<name>-<quality>)" % (vid,)
     model = VOICES / (vid + ".onnx")
     if not (model.exists() and Path(str(model) + ".json").exists()):
         r = subprocess.run([sys.executable, "-m", "piper.download_voices", "--data-dir", str(VOICES), vid],
@@ -177,26 +212,82 @@ def voice_model(vid):
     return model, None
 
 
-def speak(model, text, wav, rate=1.0):
-    """Synthesise one line with piper into wav. (seconds, err)."""
+def _piper(model, text, wav, rate):
     cfg = json.loads(Path(str(model) + ".json").read_text(encoding="utf-8"))
     scale = cfg.get("inference", {}).get("length_scale", 1.0) / rate
     src = Path(str(wav) + ".txt")
     src.write_text(text, encoding="utf-8")        # piper reads -i as utf-8; stdin would use the locale
     r = subprocess.run([sys.executable, "-m", "piper", "-m", str(model), "-i", str(src), "-f", str(wav),
                         "--length-scale", "%.4f" % scale], capture_output=True, text=True, timeout=300)
+    src.unlink()
     if r.returncode != 0 or not Path(wav).exists():
-        return None, "piper exited %d: %s" % (r.returncode, ((r.stderr or "") + r.stdout).strip()[-200:])
-    with wave.open(str(wav)) as w:
-        secs = w.getnframes() / float(w.getframerate())
-    if secs <= 0:
-        return None, "piper wrote an empty clip"
-    return secs, None
+        return "piper exited %d: %s" % (r.returncode, ((r.stderr or "") + r.stdout).strip()[-200:])
+    return None
+
+
+def _chirp3(vid, text, wav, rate, token):
+    """namo-studio namo_audio._tts, minus its API-enabling retry: a failure fails the job, with the reason."""
+    body = {"input": {"text": text}, "voice": {"languageCode": "-".join(vid.split("-")[:2]), "name": vid},
+            "audioConfig": {"audioEncoding": "LINEAR16", "sampleRateHertz": SR, "speakingRate": rate}}
+    req = urllib.request.Request(TTS_URL, json.dumps(body).encode(), {
+        "Authorization": "Bearer " + token, "x-goog-user-project": TTS_PROJECT, "Content-Type": "application/json"})
+    try:
+        audio = base64.b64decode(json.load(urllib.request.urlopen(req, timeout=120))["audioContent"])
+    except urllib.error.HTTPError as e:
+        return "chirp3 %s: TTS HTTP %d: %s" % (vid, e.code, e.read().decode("utf-8", "replace")[:300])
+    except Exception as e:
+        return "chirp3 %s: %s: %s" % (vid, type(e).__name__, str(e)[:200])
+    Path(wav).write_bytes(audio)                  # LINEAR16 comes as a whole WAV file
+    return None
+
+
+def speaker(voice):
+    """
+    (say, err) for a job voice {engine, id}. say(text, wav, rate) -> (seconds, err) writes the
+    line as a 48 kHz mono wav with the TTS edge silence stripped. No fallback to another voice.
+    """
+    eng, vid = voice.get("engine"), voice.get("id")
+    if eng not in VOICE_ID:
+        return None, "voice engine %r is not one of %s" % (eng, ", ".join(VOICE_ID))
+    if not isinstance(vid, str) or not VOICE_ID[eng].fullmatch(vid):
+        return None, "voice id %r is not a %s id (%s)" % (vid, eng, VOICE_ID[eng].pattern)
+    if eng == "piper":
+        model, err = voice_model(vid)
+        if err:
+            return None, err
+        synth = lambda text, raw, rate: _piper(model, text, raw, rate)
+    else:
+        gcloud = which("gcloud")
+        if not gcloud:
+            return None, "chirp3 voice %s needs gcloud for an access token; gcloud is not installed" % vid
+        r = subprocess.run([gcloud, "auth", "print-access-token"], capture_output=True, text=True, timeout=120)
+        token = r.stdout.strip()                  # never printed or logged
+        if r.returncode != 0 or not token:
+            return None, "chirp3 voice %s: gcloud auth print-access-token exited %d: %s" % (
+                vid, r.returncode, (r.stderr or "").strip()[-200:])
+        synth = lambda text, raw, rate: _chirp3(vid, text, raw, rate, token)
+
+    def say(text, wav, rate=1.0):
+        raw = Path(str(wav) + ".raw.wav")
+        err = synth(text, raw, rate)
+        if err:
+            return None, err
+        r = subprocess.run([which("ffmpeg"), "-y", "-v", "error", "-i", str(raw), "-af", EDGE_STRIP,
+                            "-ar", str(SR), "-ac", "1", "-c:a", "pcm_s16le", str(wav)], capture_output=True, text=True)
+        raw.unlink()
+        if r.returncode != 0:
+            return None, "%s: edge-silence strip failed: %s" % (vid, (r.stderr or "").strip()[-200:])
+        with wave.open(str(wav)) as w:
+            secs = w.getnframes() / float(w.getframerate())
+        if secs <= 0:
+            return None, "%s spoke an empty clip" % vid
+        return secs, None
+    return say, None
 
 
 def build_voice(job, vo, dur, work):
     """
-    Compose stage. One piper clip per window.VO line, placed at its t on a dur-second timeline.
+    Compose stage. One TTS clip per window.VO line, placed at its t on a dur-second timeline.
     A line's slot ends at its `end`, the next line's t, or dur, whichever is first. A clip longer
     than its slot is sped up by at most ATEMPO_MAX; past that the job fails, naming the line.
     Returns (mix.wav, per-line report, err).
@@ -208,10 +299,10 @@ def build_voice(job, vo, dur, work):
     rate = v.get("rate", 1.0)
     if not _num(rate) or not 0.5 <= rate <= 2.0:
         return None, [], "job.voice.rate must be a number in 0.5..2.0, got %r" % (rate,)
-    model, err = voice_model(v["id"])
+    say, err = speaker(v)
     if err:
         return None, [], err
-    vlang = v["id"].split("_")[0]
+    vlang = re.split(r"[-_]", v["id"])[0]
     speaks = {vlang, "sa"} if vlang == "hi" else {vlang}      # Sanskrit is spoken by the Hindi voice
     for l in vo:
         if not (isinstance(l, dict) and isinstance(l.get("id"), str) and _num(l.get("t"))
@@ -230,7 +321,7 @@ def build_voice(job, vo, dur, work):
         if l["t"] < 0 or slot <= 0:
             return None, report, "VO line %s at %.2fs has no room on a %.2fs timeline" % (l["id"], l["t"], dur)
         clip = work / ("vo%02d.wav" % i)
-        secs, err = speak(model, l["text"], clip, rate)
+        secs, err = say(l["text"], clip, rate)
         if err:
             return None, report, "VO line %s: %s" % (l["id"], err)
         tempo = max(1.0, secs / slot)
@@ -256,24 +347,31 @@ def build_voice(job, vo, dur, work):
     return mix, report, None
 
 
+def voice_for(vid):
+    """A voice id names its engine: {engine, id}, or None when no engine owns the id."""
+    eng = next((e for e, p in VOICE_ID.items() if isinstance(vid, str) and p.fullmatch(vid)), None)
+    return {"engine": eng, "id": vid} if eng else None
+
+
 def probe_voice():
     """(ok, msg). Every job carries a voice (SPEC §2): a runtime that cannot speak cannot make a film."""
-    model, err = voice_model(DEFAULT_VOICE)
+    say, err = speaker(DEFAULT_VOICE)
     if err:
         return False, "voice: " + err
     tmp = Path(tempfile.mkdtemp(prefix="namo-probe-voice-"))
     try:
-        secs, err = speak(model, "नमो", tmp / "probe.wav")
+        # a sentence, not one word: Chirp3 answered "नमो" alone with a clip of pure silence 1 time in 3
+        secs, err = say("नमस्ते, यह नमो है।", tmp / "probe.wav")
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
     if err:
-        return False, "voice %s: %s" % (DEFAULT_VOICE, err)
-    return True, "voice %s spoke %.2fs" % (DEFAULT_VOICE, secs)
+        return False, "voice %s: %s" % (DEFAULT_VOICE["id"], err)
+    return True, "voice %s spoke %.2fs" % (DEFAULT_VOICE["id"], secs)
 
 
-def fit_beats(path, voice_id=DEFAULT_VOICE, rate=1.0, pad=0.4):
+def fit_beats(path, voice=DEFAULT_VOICE, rate=1.0, pad=0.4):
     """
-    Retime an rd beats file so every beat's `vo` line fits its beat when spoken by piper at
+    Retime an rd beats file so every beat's `vo` line fits its beat when spoken by `voice` at
     `rate` (+ `pad` s breath), keeping the total length. Beats that overrun take time from
     beats with room, in proportion to that room. Rewrites the file. (rows, err)
     """
@@ -281,14 +379,14 @@ def fit_beats(path, voice_id=DEFAULT_VOICE, rate=1.0, pad=0.4):
     doc = json.loads(p.read_text(encoding="utf-8"))
     beats = doc["beats"]
     total = sum(b["dur"] for b in beats)
-    model, err = voice_model(voice_id)
+    say, err = speaker(voice)
     if err:
         return [], err
     tmp = Path(tempfile.mkdtemp(prefix="namo-fit-"))
     try:
         spoken = []
         for b in beats:
-            secs, err = speak(model, b["vo"], tmp / (b["id"] + ".wav"), rate) if b.get("vo") else (0.0, None)
+            secs, err = say(b["vo"], tmp / (b["id"] + ".wav"), rate) if b.get("vo") else (0.0, None)
             if err:
                 return [], "beat %s: %s" % (b["id"], err)
             spoken.append(secs)
@@ -310,6 +408,92 @@ def fit_beats(path, voice_id=DEFAULT_VOICE, rate=1.0, pad=0.4):
         t += d
     p.write_text(json.dumps(doc, ensure_ascii=False, indent=1) + "\n", encoding="utf-8")
     return rows, None
+
+
+def ebur128(path):
+    """(I LUFS, LRA LU, true peak dBTP) of the first audio stream, or None if ffmpeg cannot measure it."""
+    r = subprocess.run([which("ffmpeg"), "-hide_banner", "-nostats", "-i", str(path), "-map", "0:a:0",
+                        "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True)
+    s = (r.stderr or "")[(r.stderr or "").rfind("Summary:"):]
+    got = [re.search(k + r":\s+(-?[\d.]+|-inf)", s) for k in ("I", "LRA", "Peak")]
+    if r.returncode != 0 or not all(got):
+        return None
+    return tuple(float(m.group(1).replace("-inf", "-120")) for m in got)
+
+
+def compose(silent, mix, out, fps, bed, work):
+    """
+    Compose stage, every runtime. The voice mix goes through VOICE_CHAIN; an optional bed (job.bed)
+    loops under it, sidechain-ducked to BED_UNDER_VOICE_DB below the speech. The gain that brings the
+    voice alone to LUFS through a 4x-oversampled limiter at TP_CEIL is applied to the sum, so speech
+    sits at LUFS in every film whatever the bed adds in the pauses; then it is muxed under the picture
+    (fps, AAC). If AAC pushed the film's true peak over TP_MAX, the master is re-limited lower by the
+    overshoot and the audio re-muxed once (picture copied).
+    Returns ({I, LRA, TP of the film, speech: LUFS of the mastered voice}, err).
+    """
+    ff = which("ffmpeg")
+
+    def run(*a):
+        r = subprocess.run([ff, "-y", "-v", "error", *map(str, a)], capture_output=True, text=True)
+        return None if r.returncode == 0 else "ffmpeg exited %d: %s" % (r.returncode, (r.stderr or "").strip()[-300:])
+
+    voice = pre = work / "voice.wav"
+    err = run("-i", mix, "-af", VOICE_CHAIN, "-c:a", "pcm_f32le", voice)
+    lv = None if err else ebur128(voice)
+    if not lv or lv[0] < -70:
+        return None, "voice master: %s" % (err or "the voice mix is silent or unmeasurable (%r)" % (lv,))
+    if bed:
+        src = BEDS / (bed + ".flac")
+        lb = ebur128(src)
+        if not lb:
+            return None, "bed %s cannot be measured" % src.name
+        # sidechain reduction ~ (speech - threshold) * (1 - 1/ratio) = BED_DUCK_DB (namo_studio mix_audio)
+        thr = lv[0] - BED_DUCK_DB / (1 - 1 / 20.0)
+        gain = lv[0] - BED_UNDER_VOICE_DB + BED_DUCK_DB - lb[0]
+        pre = work / "pre.wav"
+        err = run("-i", voice, "-stream_loop", "-1", "-i", src, "-filter_complex",
+                  "[0:a]asplit=2[v][key];[1:a]aformat=sample_rates=%d:channel_layouts=stereo,volume=%.2fdB[b];"
+                  "[b][key]sidechaincompress=threshold=%.5f:ratio=20:attack=20:release=400:knee=2[d];"
+                  "[v][d]amix=inputs=2:normalize=0:duration=first[m]" % (SR, gain, 10 ** (thr / 20)),
+                  "-map", "[m]", "-c:a", "pcm_f32le", pre)
+        if err:
+            return None, "bed mix: " + err
+
+    def master(ceil):
+        """(master.wav, speech LUFS, err)"""
+        dst = work / "master.wav"
+        limit = lambda src, g: run("-i", src, "-af", "volume=%.3fdB,aresample=%d,alimiter=limit=%.5f:level=false:"
+                                   "attack=1:release=60,aresample=%d" % (g, SR * 4, 10 ** (ceil / 20), SR),
+                                   "-c:a", "pcm_f32le", dst)
+        gain = LUFS - lv[0]
+        for _ in range(4):        # the limiter takes a little loudness; correct what it took
+            err = limit(voice, gain)
+            if err:
+                return None, None, "master: " + err
+            i = ebur128(dst)[0]
+            if abs(i - LUFS) < 0.1:
+                break
+            gain += LUFS - i
+        err = limit(pre, gain) if pre != voice else None
+        return dst, i, ("master: " + err) if err else None
+
+    aac = ["-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", "-shortest"]
+    m, speech, err = master(TP_CEIL)
+    err = err or run("-i", silent, "-i", m, "-map", "0:v", "-map", "1:a", "-vf", "fps=%d,format=yuv420p" % fps,
+                     "-c:v", "libx264", "-preset", "slow", "-crf", "19", "-r", fps, *aac, out)
+    lf = None if err else ebur128(out)
+    if lf and lf[2] > TP_MAX:
+        m, speech, err = master(TP_CEIL - (lf[2] - TP_MAX) - 0.3)
+        redo = work / "redo.mp4"
+        err = err or run("-i", out, "-i", m, "-map", "0:v", "-map", "1:a", "-c:v", "copy", *aac, redo)
+        if not err:
+            os.replace(redo, out)
+            lf = ebur128(out)
+    if err or not lf:
+        return None, "mux: %s" % (err or "the film's audio cannot be measured")
+    if lf[2] > TP_MAX:
+        return None, "the film's true peak is %.2f dBTP, over %.1f, after one re-limit" % (lf[2], TP_MAX)
+    return {"I": lf[0], "LRA": lf[1], "TP": lf[2], "speech": speech}, None
 
 
 # ------------------------------------------------------------------ §3 runtimes
@@ -356,7 +540,7 @@ class MgRuntime(Runtime):
             return False, "node missing"
         if not chromium():
             return False, "no chrome/chromium and PLAYWRIGHT_CHROME unset"
-        for b in ("ffmpeg", "ffprobe", "sh"):
+        for b in ("ffmpeg", "ffprobe"):
             if not which(b):
                 return False, b + " missing (needed to compose and verify, SPEC §4)"
         scenes = self.scenes()
@@ -542,20 +726,18 @@ class MgRuntime(Runtime):
                         "video_mjs": str(d / "core/render/video.mjs") if d else ""}
             if not silent.exists():
                 return {"ok": False, "error": "lemo reported success but wrote no file", "log": log}
-            # compose: lemo's mux (two-pass loudnorm); grain 0, every mg style is vector
-            m = subprocess.run([which("sh"), "core/render/mux.sh", silent.as_posix(), mix.as_posix(),
-                                out.as_posix(), str(int(job["fps"])), "0"],
-                               cwd=str(d), capture_output=True, text=True)
-            log += "\n" + ((m.stdout or "") + (m.stderr or "")).strip()
-            if m.returncode != 0 or not out.exists():
-                return {"ok": False, "error": "mux exited %d" % m.returncode, "log": log[-3000:], "voice": lines}
+            # compose: master the voice (+ bed) and mux it under the picture
+            audio, err = compose(silent, mix, out, int(job["fps"]), job.get("bed"), film)
+            if err:
+                return {"ok": False, "error": err, "log": log[-3000:], "voice": lines}
+            log += "\naudio: speech %(speech).1f LUFS; film I %(I).1f LUFS, LRA %(LRA).1f LU, TP %(TP).1f dBTP" % audio
             # SPEC §4 / O1: success is not "a file appeared". Verify here, so a caller using
             # REGISTRY directly gets the same guarantee as the CLI.
             good, msg = verify_video(out, job["seconds"], job["voice"])
             if not good:
                 return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
             return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log,
-                    "voice": lines}
+                    "voice": lines, "audio": audio}
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
@@ -620,7 +802,7 @@ class RdRuntime(Runtime):
     """
     rendiv (React + TypeScript) motion-design explainers, namo/rd. CPU, free.
     The scene is a beats file, namo/rd/beats/<scene>.json; its `vo` lines are the narration.
-    Voice and mux are the mg compose stage: build_voice() and lemo's mux.sh.
+    Voice and compose are the mg ones: build_voice() and compose().
     """
     name = "rd"
     kind = "cpu"
@@ -637,18 +819,12 @@ class RdRuntime(Runtime):
         return subprocess.run(["node", "render.mjs", *args], cwd=str(self.dir), capture_output=True,
                               encoding="utf-8", errors="replace", timeout=timeout)
 
-    def mux_sh(self):
-        d = MgRuntime().engine_dir()
-        return d / "core" / "render" / "mux.sh" if d else None
-
     def probe(self):
-        for b in ("node", "ffmpeg", "ffprobe", "sh"):
+        for b in ("node", "ffmpeg", "ffprobe"):
             if not which(b):
                 return False, b + " missing"
         if not (self.dir / "node_modules" / "@rendiv" / "renderer").is_dir():
             return False, "namo/rd deps missing (cd namo/rd && npm ci && npx playwright install chromium)"
-        if not self.mux_sh():
-            return False, "lemo core/render/mux.sh not found (run namo/bootstrap.sh); rd composes with it"
         beats = self.beats()
         if not beats:
             return False, "no beats file under namo/rd/beats"
@@ -713,16 +889,15 @@ class RdRuntime(Runtime):
             log = ((r.stdout or "") + (r.stderr or "")).strip()
             if r.returncode != 0 or not silent.exists():
                 return {"ok": False, "error": "rendiv exited %d" % r.returncode, "log": log[-3000:], "voice": lines}
-            mux = self.mux_sh()
-            m = subprocess.run([which("sh"), mux.as_posix(), silent.as_posix(), mix.as_posix(), out.as_posix(),
-                                str(int(job["fps"])), "0"], cwd=str(mux.parents[2]), capture_output=True, text=True)
-            log += "\n" + ((m.stdout or "") + (m.stderr or "")).strip()
-            if m.returncode != 0 or not out.exists():
-                return {"ok": False, "error": "mux exited %d" % m.returncode, "log": log[-3000:], "voice": lines}
+            audio, err = compose(silent, mix, out, int(job["fps"]), job.get("bed"), work)
+            if err:
+                return {"ok": False, "error": err, "log": log[-3000:], "voice": lines}
+            log += "\naudio: speech %(speech).1f LUFS; film I %(I).1f LUFS, LRA %(LRA).1f LU, TP %(TP).1f dBTP" % audio
             good, msg = verify_video(out, job["seconds"], job["voice"])
             if not good:
                 return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
-            return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log, "voice": lines}
+            return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log, "voice": lines,
+                    "audio": audio}
         finally:
             shutil.rmtree(work, ignore_errors=True)
 
@@ -929,7 +1104,11 @@ def main(argv):
         return 0 if ok else 1
 
     if cmd == "fitbeats":
-        rows, err = fit_beats(argv[1], *(argv[2:3] or [DEFAULT_VOICE]), *[float(x) for x in argv[3:4]])
+        voice = voice_for(argv[2]) if len(argv) > 2 else DEFAULT_VOICE
+        if not voice:
+            print("FAIL voice id %r belongs to no engine (%s)" % (argv[2], ", ".join(VOICE_ID)))
+            return 1
+        rows, err = fit_beats(argv[1], voice, *[float(x) for x in argv[3:4]])
         for r in rows:
             print("%-5s dur %5.2fs -> %5.2fs  spoken %5.2fs  fill %.2f" % (r["id"], r["was"], r["dur"], r["spoken"], r["fill"]))
         print(("FAIL " + err) if err else "fitted %s" % argv[1])

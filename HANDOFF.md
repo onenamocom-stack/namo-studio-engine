@@ -90,6 +90,22 @@ Built 6 Nov (laptop OMP, after the phone went offline):
   speed-up, else the job fails), muxed with lemo `mux.sh`; `verify_video` requires a non-silent audio
   stream when the job has a voice. Devanagari font `NotoSerifDeva` (namo/mg/fonts.css, fetched by bootstrap).
 - Explainer `beat-director` skill written; the explainer pipeline passes `check_pipeline`.
+- **Voice + mastering** (6 Nov, owner: "audio could be more ear-pleasing"): `voice.engine` `chirp3` =
+  Google Cloud TTS `hi-IN-Chirp3-HD-<Name>` (token from `gcloud auth print-access-token`; Actions: WIF
+  provider `namo-studio-engine` as the TTS-only SA `namo-tts-ci`); `piper` unchanged. No fallback voice.
+  Defaults from a measured A/B (`out-smoke/voice_ab/ab.mp3` + `ab.txt` + `measure.json`, made by
+  `ab.py`): explainer **Kore** (highest 2-5 kHz presence, low sibilance, rate 0.95 via `emotion: calm`),
+  shloka/webshow **Charon** (deepest, median F0 84 Hz). The engine now masters and muxes itself
+  (`compose()`, lemo `mux.sh` no longer used): HPF 80 Hz, de-ess, 2.5:1 comp, +2 dB @ 3 kHz, gain set on
+  the voice alone (speech -16 LUFS) through a 4x-oversampled limiter, <= -1.5 dBTP on the encoded film.
+  Not -16 on the whole film: in gita-ep01 (~13 % speech) the bed in the pauses passes the R128 gate, and
+  chasing -16 integrated cost ~8 dB of limiting on the voice. A short room reverb lowered the
+  2-8 Hz envelope modulation (intelligibility proxy) 0.559 -> 0.551, so there is none. Optional `bed`:
+  `namo/audio/tanpura.flac`, a seamless 9.85 s loop cut from namo-studio `out/ep01/music/open_s33.wav`
+  (our own ACE-Step v1 3.5B run, Apache-2.0 model; tags "tanpura drone, low cello, bansuri"), the seed
+  with the least 1-4 kHz energy (-29 dB), sidechain-ducked 22 dB under the speech.
+- factory.yml: `FedericoCarboni/setup-ffmpeg@v3` replaces `apt-get install ffmpeg`, which took 36 min
+  of the hour-long run 42107269065.
 
 Not built (the actual backlog):
 - **Explainer runtime `rd`** (6 Nov): rendiv (`namo/rd/`, `@rendiv/*` 0.2.6 from npm), data-driven beats

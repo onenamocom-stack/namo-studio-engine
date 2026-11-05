@@ -10,6 +10,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write   # Workload Identity Federation -> Google Cloud TTS (chirp3 voices)
 
 concurrency:
   group: factory
@@ -26,12 +27,22 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
 
-      - name: system deps
+      # static ffmpeg+ffprobe, cached; `apt-get install ffmpeg` took 36 min on run 42107269065
+      - uses: FedericoCarboni/setup-ffmpeg@v3
+
+      - name: chrome
         run: |
-          sudo apt-get install -y -qq ffmpeg
           CH=$(command -v google-chrome || command -v google-chrome-stable || true)
           echo "PLAYWRIGHT_CHROME=$CH" >> $GITHUB_ENV
           echo "chrome: $CH"
+
+      # chirp3 voices: engine.py takes a token from `gcloud auth print-access-token`
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/499026166575/locations/global/workloadIdentityPools/github/providers/namo-studio-engine
+          service_account: namo-tts-ci@project-5e5df107-b8f8-4649-9d1.iam.gserviceaccount.com   # Cloud TTS only; never the deploy SA
+
+      - uses: google-github-actions/setup-gcloud@v2
 
       - uses: actions/cache@v4
         with:
@@ -56,8 +67,8 @@ jobs:
           npm ci --no-audit --no-fund
           npx playwright install --with-deps chromium
 
-      # voice: piper runs under the same python3 as namo/engine.py (not .venv), so it is
-      # installed there. Models are cached; engine.voice_model() fetches any other id on demand.
+      # voice (piper engine): piper runs under the same python3 as namo/engine.py (not .venv), so it
+      # is installed there. Models are cached; engine.voice_model() fetches any other id on demand.
       - uses: actions/cache@v4
         with:
           path: .voices

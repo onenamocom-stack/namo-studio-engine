@@ -22,11 +22,13 @@ jobs:
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
 
-      - name: system deps
+      # apt-get install ffmpeg once hung 36 min on a runner; a static build is seconds and cached.
+      - uses: FedericoCarboni/setup-ffmpeg@v3
+
+      - name: chrome
         # the runner image already carries Google Chrome — an apt install of chromium
         # drags in snap and costs ~5 minutes on every single run. Use what is there.
         run: |
-          sudo apt-get install -y -qq ffmpeg
           CH=$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser || true)
           echo "PLAYWRIGHT_CHROME=$CH" >> $GITHUB_ENV
           echo "using chrome: $CH"

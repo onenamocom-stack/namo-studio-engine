@@ -16,7 +16,7 @@ The brief can be one line. Everything the pipeline needs is derived from it:
     kind      webshow | explainer | customer | shot-test
     runtime   mg (vector, free) | h3 (gpu) | rendiv (react, if installed) | plate
     style     which playbook/palette
-    voice     piper voice id + rate
+    voice     voice id (piper or Chirp3-HD; the id names its engine) + rate
     length    seconds
     ratio     16:9 | 9:16 | 1:1
     emotion   calm | energetic | dramatic | deadpan
@@ -24,7 +24,7 @@ The brief can be one line. Everything the pipeline needs is derived from it:
 WHY RULES AND NOT A MODEL: the same brief must produce the same film tomorrow,
 on any machine, with no API key. That is the whole point of a production engine.
 """
-import json, os, re, subprocess, sys, time, hashlib
+import json, os, re, sys, time, hashlib
 from pathlib import Path
 
 NAMO = Path(__file__).resolve().parent
@@ -33,11 +33,12 @@ OUT = ROOT / "out"
 
 # ------------------------------------------------------------------ vocabulary
 
+# voice: the kind's default, chosen by measured A/B (HANDOFF.md, voice); a brief may name another id
 KINDS = {
-    "webshow":   dict(keywords=["gita","shloka","mahabharata","episode","chapter","verse","dharma","krishna","arjuna","namo"], ratio="16:9", runtime="mg", style="namo-vedic-ink", emotion="deadpan"),
-    "explainer": dict(keywords=["explain","how","why","what is","tutorial","guide","walkthrough","deep dive"], ratio="16:9", runtime="rd", style="flat-motion-graphics", emotion="energetic"),
-    "customer":  dict(keywords=["ad","promo","campaign","brand","client","launch","commercial","product"], ratio="16:9", runtime="mg", style="clean-professional", emotion="calm"),
-    "shot-test": dict(keywords=["test","probe","smoke"], ratio="16:9", runtime="mg", style="minimalist-diagram", emotion="deadpan"),
+    "webshow":   dict(keywords=["gita","shloka","mahabharata","episode","chapter","verse","dharma","krishna","arjuna","namo"], ratio="16:9", runtime="mg", style="namo-vedic-ink", emotion="deadpan", voice="hi-IN-Chirp3-HD-Charon"),
+    "explainer": dict(keywords=["explain","how","why","what is","tutorial","guide","walkthrough","deep dive"], ratio="16:9", runtime="rd", style="flat-motion-graphics", emotion="energetic", voice="hi-IN-Chirp3-HD-Kore"),
+    "customer":  dict(keywords=["ad","promo","campaign","brand","client","launch","commercial","product"], ratio="16:9", runtime="mg", style="clean-professional", emotion="calm", voice="en_US-lessac-medium"),
+    "shot-test": dict(keywords=["test","probe","smoke"], ratio="16:9", runtime="mg", style="minimalist-diagram", emotion="deadpan", voice="en_US-lessac-medium"),
 }
 
 EMOTION_VOICE = {
@@ -99,6 +100,7 @@ def plan(brief):
     emotion = brief.get("emotion") or read_emotion(text) or spec["emotion"]
     style = brief.get("style") or spec["style"]
     voice = EMOTION_VOICE[emotion]
+    vid = brief.get("voice") or spec["voice"]
     look = STYLE_LOOK.get(style, STYLE_LOOK["minimalist-diagram"])
     return {
         "prompt": text,
@@ -113,10 +115,11 @@ def plan(brief):
         "fps": int(brief.get("fps") or (30 if kind != "webshow" else 24)),
         "emotion": emotion,
         "voice": {
-            "engine": "piper",
-            "id": brief.get("voice") or ("hi_IN-pratham-medium" if kind == "webshow" else "en_US-lessac-medium"),
+            "engine": "chirp3" if "-Chirp3-HD-" in vid else "piper",
+            "id": vid,
             **voice,
         },
+        "bed": brief.get("bed"),     # namo/audio/<bed>.flac, ducked under the voice; none unless asked
         "chapters": kind in ("explainer",),
         "budget_usd": float(brief.get("budget_usd") or (0.0 if spec["runtime"] in ("mg", "rd") else 1.50)),
         "decision": {
@@ -126,10 +129,6 @@ def plan(brief):
     }
 
 # ------------------------------------------------------------------ run
-
-def sh(cmd, **kw):
-    r = subprocess.run(cmd, capture_output=True, text=True, **kw)
-    return r.returncode, (r.stdout or "") + (r.stderr or "")
 
 def step(msg): print(f"[agent] {msg}", flush=True)
 
@@ -174,6 +173,7 @@ def render(p):
         "style": p["style"],
         "emotion": p["emotion"],
         "voice": p["voice"],
+        **({"bed": p["bed"]} if p.get("bed") else {}),
         "name": f"{p['kind']}-{scenario}",
         "workers": min(6, os.cpu_count() or 2),   # one browser per core; 4 on a 2-core runner thrashed (~40 min / 60 s)
     }
@@ -191,16 +191,7 @@ def render(p):
     if not res.get("ok"):
         return {"ok": False, "error": res.get("error") or "render failed", "log": res.get("log", "")[-1500:]}
     good, msg = engine.verify_video(res["out"], p["seconds"], p["voice"])
-    return {"ok": good, "out": res.get("out"), "guard": msg, "error": None if good else msg}
-
-def voiceover(p):
-    """piper if present. Absent is not fatal: the film still renders, silent, and says so."""
-    piper = None
-    for c in ("piper", str(Path.home() / "piper/piper")):
-        if sh(["which", c.split("/")[-1]])[0] == 0 or Path(c).exists(): piper = c; break
-    if not piper:
-        return {"ok": False, "error": "piper not installed (silent film)"}
-    return {"ok": True, "note": "voice stage wired; model download happens on first real episode"}
+    return {"ok": good, "out": res.get("out"), "guard": msg, "audio": res.get("audio"), "error": None if good else msg}
 
 def main():
     args = sys.argv[1:]
@@ -220,8 +211,6 @@ def main():
     if dry:
         print(json.dumps(p, indent=1)); return 0
 
-    v = voiceover(p)
-    if not v["ok"]: step(f"voice: {v['error']}")
     res = render(p)
     p["result"] = {**res, "seconds_taken": round(time.time() - t0, 1)}
     (OUT / "plan.json").write_text(json.dumps(p, indent=1))

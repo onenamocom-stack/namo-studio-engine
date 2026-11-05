@@ -66,7 +66,8 @@ a job that is missing a required key, before any renderer is called.
   "ratio":    "16:9 | 9:16 | 1:1",
   "style":    "namo-vedic-ink",
   "emotion":  "calm | energetic | dramatic | deadpan",
-  "voice":    {"engine": "piper", "id": "hi_IN-pratham-medium", "rate": 1.0},
+  "voice":    {"engine": "chirp3 | piper", "id": "hi-IN-Chirp3-HD-Charon", "rate": 1.0},
+  "bed":      "tanpura",
   "name":     "gita-ep01",
   "workers":  4
 }
@@ -78,6 +79,14 @@ a job that is missing a required key, before any renderer is called.
 - `scene` must be a plain directory name inside `namo/mg/scenes/`.
 - `name` is sanitised to `[A-Za-z0-9._-]` before it is used in a path.
 - `workers` is optional, default 4.
+- `voice.id` must belong to `voice.engine`: `chirp3` = Google Cloud TTS `<lang>-<REGION>-Chirp3-HD-<Name>`,
+  `piper` = `<lang>_<REGION>-<name>-<quality>`. A voice that cannot speak fails the job, with the reason;
+  there is no fallback voice.
+- `bed` is optional: a loop in `namo/audio/<bed>.flac`, ducked to 22 dB under the speech.
+- Every film's audio is mastered by the engine (high-pass 80 Hz, de-ess, 2.5:1 compression,
+  presence lift): **speech at -16 LUFS** (R128 integrated of the mastered voice), **true peak
+  <= -1.5 dBTP measured on the encoded film**. With dense narration the film's integrated loudness
+  is the same -16; a bed filling long pauses lowers the film's figure, never the speech.
 
 **Every plan field must reach the renderer.** A renderer that ignores `seconds`, `ratio` or
 `style` is not implementing this contract; it is rendering whatever the scene file says.
