@@ -190,21 +190,23 @@ class MgRuntime(Runtime):
         if os.environ.get("NAMO_PROBE_RENDER", "1") == "1":
             try:
                 scene = scenes[0]
-                work = Path(tempfile.mkdtemp(prefix="namo-probe-"))
+                tag = "probe-%s" % os.getpid()
+                work = d / "films" / tag          # lemo resolves films/<x> from its own cwd
                 try:
-                    film = work / "films" / scene
-                    film.parent.mkdir(parents=True, exist_ok=True)
-                    shutil.copytree(SCENES / scene, film)
+                    if work.exists():
+                        shutil.rmtree(work, ignore_errors=True)
+                    work.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copytree(SCENES / scene, work)
                     css = NAMO / "mg" / "fonts.css"
                     if css.exists():
-                        shutil.copy(css, film / "fonts.css")
-                    out = work / "still.jpg"
+                        shutil.copy(css, work / "fonts.css")
+                    outdir = Path(tempfile.mkdtemp(prefix="namo-probe-out-"))
                     env = {**os.environ, "PLAYWRIGHT_CHROME": chromium()}
                     pr = subprocess.run(
-                        ["node", "core/render/still.mjs", "films/" + scene, "1.0",
-                         "--out", str(work), "--prefix", "still_"],
+                        ["node", "core/render/still.mjs", "films/" + tag, "1.0",
+                         "--out", str(outdir), "--prefix", "still_"],
                         cwd=str(d), env=env, capture_output=True, text=True, timeout=180)
-                    made = sorted(work.glob("still_*.jpg"))
+                    made = sorted(outdir.glob("still_*.jpg"))
                     if pr.returncode != 0 or not made:
                         return False, ("render probe failed: exited %d, %d still(s)%s"
                                        % (pr.returncode, len(made),
@@ -213,6 +215,7 @@ class MgRuntime(Runtime):
                         return False, "render probe produced a %d-byte still" % made[0].stat().st_size
                 finally:
                     shutil.rmtree(work, ignore_errors=True)
+                    shutil.rmtree(locals().get("outdir", Path("/nonexistent")), ignore_errors=True)
             except Exception as e:
                 return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
         return True, "engine=%s scenes=%d, chrome ok, one still rendered" % (d.name, len(scenes))
