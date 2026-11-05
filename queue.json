@@ -1,13 +1,9 @@
 {
- "note": "the factory reads this. add a job, push, and the factory makes it. an infeasible job is BLOCKED with a reason, never silently skipped.",
+ "note": "factory reads this. add a job, push, and the factory makes it.",
  "jobs": [
   {
    "id": "gita-ep01",
    "prompt": "gita chapter 1 shloka 1 episode 1, 60 seconds"
-  },
-  {
-   "id": "jev-explainer",
-   "prompt": "make a 30 second explainer about how Jev mode works"
   }
  ]
 }
