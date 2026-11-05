@@ -11,6 +11,10 @@ on:
       ratio:   {description: "16:9 | 9:16 | 1:1", required: false, default: ""}
       dry:     {description: "1 = print the plan, render nothing", required: false, default: ""}
 
+permissions:
+  contents: read
+  id-token: write   # Workload Identity Federation -> Google Cloud TTS (chirp3 voices)
+
 jobs:
   make:
     runs-on: ubuntu-latest
@@ -24,6 +28,14 @@ jobs:
 
       # apt-get install ffmpeg once hung 36 min on a runner; a static build is seconds and cached.
       - uses: FedericoCarboni/setup-ffmpeg@v3
+
+      # chirp3 voices: engine.py takes a token from `gcloud auth print-access-token`
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/499026166575/locations/global/workloadIdentityPools/github/providers/namo-studio-engine
+          service_account: namo-tts-ci@project-5e5df107-b8f8-4649-9d1.iam.gserviceaccount.com   # Cloud TTS only; never the deploy SA
+
+      - uses: google-github-actions/setup-gcloud@v2
 
       - name: chrome
         # the runner image already carries Google Chrome — an apt install of chromium
