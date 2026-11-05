@@ -72,7 +72,7 @@ jobs:
           retention-days: 14
 
       - name: publish to R2
-        if: success()
+        if: success() && env.R2_AK != ''
         env:
           R2_AK: ${{ secrets.R2_AK }}
           R2_SK: ${{ secrets.R2_SK }}
