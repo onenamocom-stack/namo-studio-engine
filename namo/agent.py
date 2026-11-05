@@ -156,8 +156,22 @@ def render(p):
         return {"ok": False,
                 "error": f"no scene authored for kind '{p['kind']}'. "
                          f"scenes on disk: {have}. Add namo/mg/scenes/<name>/ or pass scene=<name>."}
-    job = {"scene": scenario, "fps": p["fps"], "workers": 4,
-           "name": f"{p['kind']}-{scenario}", "seconds": p["seconds"]}
+    # SPEC §2: a job must carry the whole decision, not a subset. The engine refuses a
+    # partial job before rendering, which is why every run used to fail with no reason.
+    job = {
+        "schema": "namo.job/1",
+        "kind": p["kind"],
+        "runtime": p["runtime"],
+        "scene": scenario,
+        "seconds": p["seconds"],
+        "fps": p["fps"],
+        "ratio": p["ratio"],
+        "style": p["style"],
+        "emotion": p["emotion"],
+        "voice": p["voice"],
+        "name": f"{p['kind']}-{scenario}",
+        "workers": 4,
+    }
     OUT.mkdir(exist_ok=True)
     jobfile = OUT / "job.json"
     jobfile.write_text(json.dumps(job, indent=1))
