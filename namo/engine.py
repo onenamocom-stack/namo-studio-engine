@@ -286,7 +286,8 @@ class MgRuntime(Runtime):
             r = subprocess.run(cmd, cwd=str(d), env=env, capture_output=True, text=True)
             log = ((r.stdout or "") + (r.stderr or ""))[-4000:]
             if r.returncode != 0:
-                return {"ok": False, "error": "lemo exited %d" % r.returncode, "log": log}
+                return {"ok": False, "error": "lemo exited %d" % r.returncode,
+                        "cmd": " ".join(cmd), "cwd": str(d), "log": log or "(no output)"}
             if not out.exists():
                 return {"ok": False, "error": "lemo reported success but wrote no file", "log": log}
             # SPEC §4 / O1: success is not "a file appeared". Verify here, so a caller using
