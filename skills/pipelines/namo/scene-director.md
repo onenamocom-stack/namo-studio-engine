@@ -12,18 +12,18 @@ You turn the episode's **authored** shot list into a `scene_plan` (`pipeline_def
 | Shot list | yaml `contracts.shots` = `show/{ep}/shots.json`; for a v2 episode the authored list is `beats[]` of namo-studio `manufacture/plans/<ep>_episode.json` (written and checked by `namo_write.py check`) | The shots — authority |
 | Prior artifact | `script` (`sections[].id` = shot id, timings, `metadata.namo.beats`) | Timing per shot |
 | Engine | `python namo/engine.py probe` → `REGISTRY` | Which runtimes exist now |
-| Bible | `SHOW_BIBLE.json` (`per_shot_rule`, `light_logic`, `photography`, `banners`, `negative_prompt`) | Shot validity |
-| Playbooks | `namo-vedic-ink` (mg ink-wash, `lemo/styles/ink-wash/STYLE.md`), `namo-vedic-painted` (H3 painted plates) | The only two looks |
+| Bible | namo-studio `manufacture/SHOW_BIBLE.json` (`per_shot_rule`, `light_logic`, `photography`, `banners`, `negative_prompt`) | Shot validity |
+| Playbooks | `namo-vedic-ink` (mg ink-wash, `lemo/styles/ink-wash/STYLE.md`), `namo-vedic-painted` (painted look of H3 shots and plates) | The only two looks |
 
 ## Runtimes (yaml `stages[scene_plan].runtimes`)
 
 | Runtime | What | Limit | Look |
 |---------|------|-------|------|
 | `mg` | ink-wash vector, lemo engine, CPU, ~0.04 s/frame, free | the scene's `scene.json` `seconds_range` for the whole film | `namo-vedic-ink` |
-| `h3` | MiniMax H3 image-to-video, outsourced GPU, raw stems per `GPU_CONTRACT` | 5 s per clip (yaml) | `namo-vedic-painted` |
+| `h3` | MiniMax H3 image-to-video, GPU — **not an engine runtime**: made only by namo-studio `manufacture/namo_pod_run.py` (768x1344, 24 fps) | an existing namo-studio shot in R2 `render/<ep>/shots/` | `namo-vedic-painted` |
 | `plate` | still image + 2.5D camera move, CPU | — | `namo-vedic-painted` |
 
-A runtime may be assigned only if it is in `engine.REGISTRY` after `probe` (SPEC R1/R2). Today `namo/engine.py` registers candidates `mg` and `h3` only; `plate` has no runtime class, so a shot can be assigned `plate` only once one is registered. `h3` is in `REGISTRY` only when `RUNPOD_KEY` is set and the provider answers.
+A runtime may be assigned only if it is in `engine.REGISTRY` after `probe` (SPEC R1/R2). Today `namo/engine.py` registers candidates `mg` and `rd` only (the webshow uses `mg`); `plate` has no runtime class, so a shot can be assigned `plate` only once one is registered. `h3` is never in `REGISTRY`: a shot may be bound to `h3` only when namo-studio has already published it to R2 `render/<ep>/shots/<SHOT>.mp4`; otherwise it is a namo-studio episode (see namo-studio `FACTORY_MANUAL.md`).
 
 ## Output Artifact: `scene_plan`
 
@@ -66,7 +66,7 @@ For explain beats (`…x`), confirm the Sanskrit rule at picture level: the spea
 For each shot pick the cheapest runtime in `REGISTRY` that can show what the shot describes:
 
 - Ink-wash vector (`mg`) for the show's spine: verse cues on the paper, the hall drawn in ink, the armies as washes. Free.
-- `h3` for shots that need photographic motion of cast (lips moving on a Sanskrit line, a chariot moving). Paid; shot length ≤ the runtime limit.
+- `h3` for shots that need photographic motion of cast (lips moving on a Sanskrit line, a chariot moving) — only an H3 shot namo-studio has already made; the engine never renders one.
 - `plate` only when registered.
 
 Write `why` per shot in one line. At least one shot must be `mg` — the ink-wash is the show's spine.
@@ -74,7 +74,7 @@ Write `why` per shot in one line. At least one shot must be `mg` — the ink-was
 ### Step 5: Validate
 
 - [ ] `len(scenes) == N`, ids and order identical to the authored list
-- [ ] Every shot has a runtime that is in `REGISTRY` and a style from the two playbooks
+- [ ] Every shot has a runtime that is in `REGISTRY` (or `h3` with its namo-studio shot already in R2) and a style from the two playbooks
 - [ ] ≥ 1 `mg` shot
 - [ ] No shot longer than its runtime's limit
 - [ ] Every shot names fire, props, ground
@@ -90,5 +90,5 @@ Write `why` per shot in one line. At least one shot must be `mg` — the ink-was
 ## Common Pitfalls
 
 - **"Improving" the shot list.** One added cutaway breaks the author's timing and the Sanskrit rule's beat pairing.
-- **Assigning `h3` to save effort.** It costs money and returns stems that still need compose; ink-wash is free and is the show's look.
+- **Assigning `h3` to save effort.** It costs GPU pod hours in namo-studio and still needs compose; ink-wash is free and is the show's look.
 - **Assigning a runtime that is not registered.** The film will fail in assets, after money may already be spent.

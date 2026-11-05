@@ -101,7 +101,8 @@ stages:
     produces: [scene_plan]
     note: >
       Picks a runtime per beat from the animation-runtime-selector:
-      ink-theater (character acts), flat-mg (data card), mg (diagram), h3 (footage), plate (still).
+      ink-theater (character acts), flat-mg (data card), mg (diagram), plate (still).
+      H3 footage is not an engine runtime (namo-studio makes H3 shots).
     success_criteria:
       - No 3+ consecutive beats of the same runtime
       - Every runtime named is actually available in preflight

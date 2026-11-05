@@ -8,7 +8,7 @@ You run the seven stages serially, review each artifact against the yaml's `succ
 
 This is not the generic explainer EP (`skills/pipelines/explainer/executive-producer.md`). Three differences are binding:
 
-1. **The contracts outrank every playbook and every director.** `SHOW_BIBLE`, `GPU_CONTRACT`, `PROVISIONING_RULES` win any conflict.
+1. **The contracts outrank every playbook and every director.** namo-studio `manufacture/SHOW_BIBLE.json` and `CAST_WEIGHTAGE.json` win any conflict.
 2. **A limit hit is a stop, not "proceed with warnings".** A NAMO film that fails a gate is never shipped.
 3. **The run ends at APPROVED.** Nothing is uploaded or posted from this pipeline.
 
@@ -17,8 +17,8 @@ This is not the generic explainer EP (`skills/pipelines/explainer/executive-prod
 | Layer | Resource | Purpose |
 |-------|----------|---------|
 | Pipeline | `pipeline_defs/namo-webshow.yaml` | Stages, notes, success criteria, budget, limits |
-| Contracts | yaml `contracts:` — `bible`, `gpu`, `provisioning` (`manufacture/*.json` in namo-studio; identical engine copies in `namo/SHOW_BIBLE.json`, `namo/GPU_CONTRACT.json`, `namo/PROVISIONING_RULES.json`) | Look, stem format, GPU spend rules |
-| Corpus | yaml `contracts.corpus` = `corpus/mahabharatam.txt` (DCS, CC-BY 4.0, fetched by `.github/workflows/namo-studio.yml`) | Research |
+| Contracts | yaml `contracts:` — `bible` (namo-studio `manufacture/SHOW_BIBLE.json`; cast in `manufacture/CAST_WEIGHTAGE.json`; the engine keeps none) | Look, cast |
+| Corpus | yaml `contracts.corpus` = `corpus/mahabharatam.txt` (DCS, CC-BY 4.0, fetched by namo-studio `.github/workflows/namo-check.yml`) | Research |
 | Router plan | `namo/agent.py plan()` | `seconds`, `ratio`, `fps`, `style`, `voice`, `budget_usd` |
 | Engine | `namo/engine.py` | `pipeline` check, runtime `REGISTRY`, `verify_video()` |
 | Skills | the seven `pipelines/namo/*-director` skills, `meta/checkpoint-protocol`, `meta/reviewer` | Stage procedures |
@@ -29,7 +29,7 @@ Run, in this order; any non-zero exit stops the run with the printed reason:
 
 1. `python namo/engine.py pipeline pipeline_defs/namo-webshow.yaml` → must print `PASS`.
 2. `python namo/drift.py` → no `[BLOCK]` line touching this pipeline.
-3. `python namo/namo_check.py` → "If this fails, do not generate and do not rent GPU."
+3. In namo-studio: `python manufacture/namo_check.py` → "If this fails, do not generate and do not rent GPU."
 4. `python namo/engine.py probe` → record which runtimes are in `REGISTRY`. A runtime that is not in `REGISTRY` may not be assigned by the scene director (SPEC R1/R2).
 5. Load the router plan. `style` must be one of `compatible_playbooks.recommended` (`namo-vedic-ink`, `namo-vedic-painted`); `custom_allowed: false` means any other style is refused, not adapted.
 
@@ -74,15 +74,15 @@ Gate decision:
 | research | Shloka in Devanagari + IAST + chhanda, DCS-verified; ≥ 5 lemmas with DCS counts; set and era match `SHOW_BIBLE.world` / `.era` | revise research |
 | script | Every Sanskrit section's text equals the research shloka's pada text (no LLM-written Sanskrit); Sanskrit rule holds on every Sanskrit line; ends on the open question (no moral, no summary); every beat has measured speech + ≥ 0.3 s air | revise script |
 | scene_plan | Scene count and order equal the authored shot list exactly; every scene has a runtime from `REGISTRY`; ≥ 1 `mg` (ink-wash) scene; no scene over its runtime max | revise scene_plan |
-| assets | Every stem matches `GPU_CONTRACT.gpu_outputs` (or the mg render passed `verify_video`); `SHA256SUMS` verified; `pods_alive == []`; spend ≤ budget | revise assets / send back to scene_plan if a shot cannot be made on its runtime |
+| assets | Every mg render passed `verify_video`; every H3 shot (made by namo-studio) is 768x1344, 24 fps, not flat-black (max YAVG > 17) and was dryrun-validated; `SHA256SUMS` verified; `pods_alive == []`; spend ≤ budget | revise assets / send back to scene_plan if a shot cannot be made on its runtime |
 | edit | Cut order = shot order; transitions are ink blooms or hard cuts, never a dissolve; narration segments sit inside their cuts | revise edit |
 | compose | `final_review.status == pass`: duration within 5 % of `seconds`, zero blank frames, −16 LUFS ± 1, subtitles present | revise compose / send back to edit or assets |
 
 ## Budget and GPU Spend
 
-- The only paid work is GPU (`h3` runtime, `cost_per_sec_usd = 0.00039` in `namo/engine.py`). Before the assets stage, compute `sum(h3 shot seconds) × 0.00039` plus pod overhead from `PROVISIONING_RULES.cost_ceilings`; if it exceeds `budget_total_usd` or `cost_ceilings.per_episode_usd`, STOP before renting.
-- `PROVISIONING_RULES.hard_rules` apply as written: no pod without a named GPU type, datacenter and precomputed max cost; a pod that does not boot within its timeout is deleted at once.
-- A pod that booted and then hit an error is held for the fix and resumed on the same pod; it is released only after 30 continuous minutes with no render and no log change. When the assets stage completes, no pod may be alive — check `pods_alive` against the provider list, not against memory.
+- The engine spends nothing: its runtimes are `mg` and `rd` (CPU, free). The only paid work is H3 shots, made by namo-studio `manufacture/namo_pod_run.py` (see namo-studio `FACTORY_MANUAL.md`), never through `namo/engine.py`. Cost per episode = pod hours × price (RTX PRO 6000 ~$2.49/h; boot 9–19 min, ~80–110 s per shot turbo), not per second; if it exceeds `budget_total_usd`, STOP before renting.
+- namo_pod_run rules apply as written: one pod session; global weights volume `namo-weights-global`; budget floor `NAMO_BUDGET_FLOOR` (default $0.25) stops the run and keeps the shots.
+- A pod is never released on an error: it is held for the fix and resumed on (in-pod watchdog releases it after 30 min idle). On success it is released at once unless `NAMO_KEEP_POD=1`. When the assets stage completes, no pod may be alive — check `pods_alive` against the provider list, not against memory.
 
 ## Phase 2: Final Decision
 
@@ -94,7 +94,7 @@ After compose, read `final_review`. `pass` → run publish (export bundle, `pend
 - The router plan's `kind` is not `webshow`, or its style is not a recommended NAMO playbook.
 - The authored shot list for the episode does not exist (the scene director may not invent one).
 - The verse window has no GRETIL/DCS text (research cannot cite it).
-- The cost estimate exceeds the budget or a provisioning ceiling.
+- The cost estimate exceeds the budget.
 - Wall time passes 45 minutes: stop where you are, checkpoint `failed` with the stage reached.
 
 ## Common Pitfalls

@@ -31,7 +31,7 @@ REQUIRED = ("schema", "kind", "runtime", "scene", "seconds", "fps",
             "ratio", "style", "emotion", "voice", "name")
 ENUMS = {
     "kind": {"webshow", "explainer", "customer", "shot-test"},
-    "runtime": {"mg", "h3", "rd"},
+    "runtime": {"mg", "rd"},
     "ratio": {"16:9", "9:16", "1:1"},
     "emotion": {"calm", "energetic", "dramatic", "deadpan"},
 }
@@ -742,62 +742,6 @@ class MgRuntime(Runtime):
             shutil.rmtree(work, ignore_errors=True)
 
 
-class H3Runtime(Runtime):
-    """SPEC §3. MiniMax H3 on outsourced GPU. Produces raw stems, never a finished film."""
-    name = "h3"
-    kind = "gpu"
-    produces = "stems"
-    cost_per_sec_usd = 0.00039
-    max_seconds = 120
-
-    def __init__(self):
-        self.script = NAMO / "namo_gpu.py"
-
-    def probe(self):
-        key = os.environ.get("RUNPOD_KEY")
-        if not key:
-            return False, "RUNPOD_KEY unset"
-        if not self.script.exists():
-            return False, "namo/namo_gpu.py missing"
-        try:
-            import urllib.request
-            req = urllib.request.Request("https://rest.runpod.io/v1/pods",
-                                         headers={"Authorization": "Bearer " + key})
-            with urllib.request.urlopen(req, timeout=20) as f:
-                if f.status != 200:
-                    return False, "provider replied %s" % f.status
-        except Exception as e:
-            return False, "provider unreachable: %s" % str(e)[:100]
-        return True, "provider reachable, dispatcher present"
-
-    def render(self, job, outdir):
-        ok, why = validate_job(job)
-        if not ok:
-            return {"ok": False, "kind": "stems", "produces": "stems", "error": why}
-        ok, why = self.probe()          # exactly one probe call per render
-        if not ok:
-            return {"ok": False, "kind": "stems", "produces": "stems", "error": why}
-
-        stem_dir = Path(outdir).resolve() / "stems" / sanitise_name(job["name"])
-        if stem_dir.exists():
-            shutil.rmtree(stem_dir, ignore_errors=True)   # SPEC §4 / O3
-        stem_dir.mkdir(parents=True, exist_ok=True)
-
-        r = subprocess.run([sys.executable, str(self.script),
-                            "--job", json.dumps(job), "--out", str(stem_dir)],
-                           capture_output=True, text=True)
-        log = ((r.stdout or "") + (r.stderr or ""))[-4000:]
-        stems = sorted(str(p) for p in stem_dir.glob("*.mp4"))
-        manifest = stem_dir / "stems.json"
-        manifest.write_text(json.dumps({"job": job, "stems": stems, "exit": r.returncode}, indent=1))
-        if r.returncode != 0:
-            return {"ok": False, "kind": "stems", "produces": "stems", "error": "dispatcher exited %d" % r.returncode, "log": log}
-        if not stems:
-            return {"ok": False, "kind": "stems", "produces": "stems", "error": "dispatcher produced no stems", "log": log}
-        return {"ok": True, "kind": "stems", "produces": "stems", "stems": stems,
-                "manifest": str(manifest), "log": log}
-
-
 class RdRuntime(Runtime):
     """
     rendiv (React + TypeScript) motion-design explainers, namo/rd. CPU, free.
@@ -902,7 +846,7 @@ class RdRuntime(Runtime):
             shutil.rmtree(work, ignore_errors=True)
 
 
-CANDIDATES = {rt.name: rt for rt in (MgRuntime(), H3Runtime(), RdRuntime())}
+CANDIDATES = {rt.name: rt for rt in (MgRuntime(), RdRuntime())}
 REGISTRY = {}
 
 
@@ -1147,11 +1091,6 @@ def main(argv):
         if not res.get("ok"):
             print("RENDER FAILED: %s" % res.get("error"))
             return 1
-        if res.get("produces", res.get("kind")) != "film":
-            print("STEMS OK (%s): %d file(s) in %s — a film still has to be composed"
-                  % (res.get("produces"), len(res.get("stems", [])),
-                     Path(res.get("manifest", "")).parent))
-            return 0
         good, msg = verify_video(res["out"], job["seconds"], job["voice"])
         print(("PASS " if good else "REJECT ") + msg)
         return 0 if good else 1

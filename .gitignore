@@ -104,3 +104,8 @@ venv/
 
 # Local Wan / diffusers GPU environment
 .venv-wan/
+
+# NAMO factory: engines cloned by namo/bootstrap.sh, piper voices (.voices, *.onnx above), render output
+/lemo/
+/ftm/
+/out/

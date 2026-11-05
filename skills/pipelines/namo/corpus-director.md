@@ -12,8 +12,8 @@ Your output fixes, for everything downstream: which verses are spoken, their exa
 |-------|----------|---------|
 | Schema | `schemas/artifacts/research_brief.schema.json` | Artifact validation |
 | Spoken text | GRETIL e-text of the BORI critical edition, Bhishmaparvan: `https://gretil.sub.uni-goettingen.de/gretil/1_sanskr/2_epic/mbh/mbh_06_u.htm` (parsed by namo-studio `manufacture/namo_write.py gretil()`: main text only, half-lines `a`/`c`) | The Sanskrit that is spoken and subtitled |
-| Corpus | yaml `contracts.corpus` = `corpus/mahabharatam.txt` — DCS, CC-BY 4.0, fetched from `https://raw.githubusercontent.com/ambuda-org/dcs/master/mahabharatam.txt` by `.github/workflows/namo-studio.yml`; loader namo-studio `vedic/namo_vedic.py` (`Corpus().verse(vid)`, `.devanagari(vid)`, `.search(lemma)`), appearance lookup `manufacture/namo_text.py` | Verse cross-check, lemma counts |
-| Bible | `SHOW_BIBLE.json` (`world`, `era`, `evidence`, `banners`) | Location and era |
+| Corpus | yaml `contracts.corpus` = `corpus/mahabharatam.txt` — DCS, CC-BY 4.0, fetched from `https://raw.githubusercontent.com/ambuda-org/dcs/master/mahabharatam.txt` by namo-studio `.github/workflows/namo-check.yml`; loader namo-studio `vedic/namo_vedic.py` (`Corpus().verse(vid)`, `.devanagari(vid)`, `.search(lemma)`), appearance lookup `manufacture/namo_text.py` | Verse cross-check, lemma counts |
+| Bible | namo-studio `manufacture/SHOW_BIBLE.json` (`world`, `era`, `evidence`, `banners`); cast in `manufacture/CAST_WEIGHTAGE.json` | Location and era |
 | Router plan | `ep`, `seconds`, verse window from the brief | Scope |
 
 Verse ids are `M.<parvan>.<adhyaya>.<verse>` (BORI numbering). The Bhagavad Gita is Bhishmaparvan adhyayas 23–40 of the critical edition: Gita chapter *n*, verse *v* is `M.6.(22+n).v`. Confirm every mapping by text match, never by arithmetic alone.

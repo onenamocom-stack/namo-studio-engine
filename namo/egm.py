@@ -130,8 +130,7 @@ def full_review(round_dir):
         total += meta["blockers"]; out[name] = meta
     return total, out
 
-GENESIS = ("SPEC.md", "program.md", "pipeline_defs/", "_CONTRACT.json",
-           "PROVISIONING_RULES", "SHOW_BIBLE")
+GENESIS = ("SPEC.md", "program.md", "pipeline_defs/")
 
 def apply_patches(text, workdir):
     touched = []

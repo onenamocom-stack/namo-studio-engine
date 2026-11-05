@@ -30,7 +30,7 @@ This is `namo_audio.sanskrit_rule()` in namo-studio; `make_plan` refuses an epis
 |---|---|---|
 | Length | plan `seconds` (webshow default 60; the scene accepts its `scene.json` `seconds_range`) | 80–95 s (`namo_write.py RUNTIME`) |
 | Sanskrit lines | 5 subtitle cues (yaml: "60 seconds, 5 subtitle cues"), each followed by its explain beat | 4–6 dialogue beats, each followed by its explain beat; 3–5 narrator bridges (`hook`/`scene`); 0–2 `silence` beats; 15–23 beats total |
-| Voices | one piper voice speaks Hindi **and** Sanskrit (`engine.build_voice`: "Sanskrit is spoken by the Hindi voice") | narrator = plan voice; each dialogue line in its speaker's own cast voice (`GPU_CONTRACT.cpu_does`: "dialogue (per-character voice)") |
+| Voices | one piper voice speaks Hindi **and** Sanskrit (`engine.build_voice`: "Sanskrit is spoken by the Hindi voice") | narrator = plan voice; each dialogue line in its speaker's own cast voice (namo-studio `namo-voice.yml`, Chirp3-HD: narrator Charon, Dhritarashtra Orus, Sanjaya Iapetus) |
 | Speech fit | a line may be sped up ≤ 1.15× (`ATEMPO_MAX`) to fit; past that the render fails | beat = `voice_in` + measured speech + tail on the 24 fps 17k+5 frame grid; ≤ 8 s per beat; silence 2.3 s |
 
 For `mg`, the scene renders its own authored `window.VO` lines; the engine cannot make a scene say a different script. If your script differs from the scene's authored cues, the stage output is a script **plus** the statement that the scene must be re-authored before render — never a script that the renderer will silently ignore (SPEC §6).

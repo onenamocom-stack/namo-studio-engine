@@ -12,7 +12,7 @@ You render the finished episode on CPU (`pipeline_defs/namo-webshow.yaml`, stage
 | Prior artifacts | `edit_decisions`, `asset_manifest`, `script` (target length, lines) | What to render |
 | Tools | `video_compose` (operation `render`/`compose`, `burn_subtitles`), `audio_mixer` (ducking, `loudnorm_target`) — yaml `required_tools` | Render, mix |
 | Engine | `namo/engine.py verify_video(path, seconds, voice)` (SPEC §4) | Acceptance |
-| Contract | `GPU_CONTRACT.format_rules` (`audio_out`: 48 kHz stereo, −16 LUFS integrated, true peak −1.5 dBTP; `video`: h264, yuv420p, 24 fps) | Output spec |
+| Gate | namo-studio `qa/qa_video.py --lufs -16 --tp -1.5 --expect-cuts` (48 kHz stereo, −16 LUFS integrated, true peak ≤ −1.5 dBTP, planned hard cuts; video h264, yuv420p, 24 fps) | Output spec |
 
 ## Process
 

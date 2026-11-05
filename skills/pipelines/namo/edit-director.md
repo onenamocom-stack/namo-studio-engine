@@ -37,7 +37,7 @@ Check: cut ids in the same order as `metadata.namo.shot_order`, which equals the
 ### Step 2: Transitions
 
 - Inside the ink-wash (`mg`) film, transitions are the lemo compositor's ink blooms; they are already in the rendered film — record them in `transitions[]` with `type: "ink_bloom"`.
-- Between separately rendered shots (h3 clips, or an h3 clip next to the mg film), use `cut`. The episode's authored `cut` field marks where a hard cut is required, and compose QA checks for it (`qa_video.py --expect-cuts`).
+- Between separately rendered shots (H3 shots made by namo-studio, or an H3 shot next to the mg film), use `cut`. The episode's authored `cut` field marks where a hard cut is required, and compose QA checks for it (`qa_video.py --expect-cuts`).
 - `dissolve`, `fade`, `wipe`, `xfade` of any kind: forbidden.
 
 ### Step 3: Subtitles
@@ -47,7 +47,7 @@ One cue per sentence, its times snapped to the voice pauses:
 - Narrator lines (`hook`, `scene`, `explain`): Hindi, ≤ 2 lines × 42 characters.
 - Sanskrit lines: their own Devanagari, one small line ≤ 60 characters; the meaning follows in the narrator's voice, not as a translation subtitle.
 - English goes only to `final.en.srt`, never burned.
-- Placement: inside the shot's liubai (empty paper) for ink-wash shots; inside the safe subtitle box for vertical h3 shots.
+- Placement: inside the shot's liubai (empty paper) for ink-wash shots; inside the safe subtitle box for vertical (768x1344) H3 shots.
 
 ### Step 4: Audio
 
@@ -73,6 +73,6 @@ One cue per sentence, its times snapped to the voice pauses:
 
 ## Common Pitfalls
 
-- **Reaching for a dissolve** because two h3 clips do not match. The show cuts; a mismatched clip is re-rendered.
+- **Reaching for a dissolve** because two H3 shots do not match. The show cuts; a mismatched shot is re-rendered (in namo-studio).
 - **Burning English.** The film is Hindi; English is a sidecar `.srt`.
 - **Music under a hard drop.** A voice starting within 0.5 s of a drop lands on silence the score just created.

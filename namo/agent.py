@@ -14,7 +14,7 @@ pixel guard. A decision is a resolved record, not a conversation.
 The brief can be one line. Everything the pipeline needs is derived from it:
 
     kind      webshow | explainer | customer | shot-test
-    runtime   mg (vector, free) | h3 (gpu) | rendiv (react, if installed) | plate
+    runtime   mg (lemo ink-wash) | rd (rendiv explainers); GPU/H3 episodes are namo-studio's job
     style     which playbook/palette
     voice     voice id (piper or Chirp3-HD; the id names its engine) + rate
     length    seconds
@@ -121,10 +121,10 @@ def plan(brief):
         },
         "bed": brief.get("bed"),     # namo/audio/<bed>.flac, ducked under the voice; none unless asked
         "chapters": kind in ("explainer",),
-        "budget_usd": float(brief.get("budget_usd") or (0.0 if spec["runtime"] in ("mg", "rd") else 1.50)),
+        "budget_usd": float(brief.get("budget_usd") or 0.0),
         "decision": {
             "why_kind": f"{hit} keyword hit(s)" if hit else "no keyword hit, defaulted to explainer",
-            "why_runtime": "CPU motion graphics are free and deterministic" if spec["runtime"] in ("mg", "rd") else "needs real motion footage",
+            "why_runtime": "CPU motion graphics are free and deterministic",
         },
     }
 

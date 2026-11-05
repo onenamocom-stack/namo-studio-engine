@@ -18,7 +18,7 @@ You master the client-approved edit (`pipeline_defs/namo-customer.yaml`, stage `
 
 ### Step 1: Render Every Variant
 
-For the master and each `variants[]` entry: mix with `audio_mixer` (`loudnorm_target: -16`, true peak ≤ −1.5 dBTP — the NAMO delivery standard of `GPU_CONTRACT.format_rules.audio_out`, unless the brief names a platform spec), then `video_compose` `render` in the approved runtime at full resolution. Delete the target path first (SPEC O3). One output per deliverable id.
+For the master and each `variants[]` entry: mix with `audio_mixer` (`loudnorm_target: -16`, true peak ≤ −1.5 dBTP — the NAMO delivery standard, `LUFS`/`TP_MAX` in `namo/engine.py`, unless the brief names a platform spec), then `video_compose` `render` in the approved runtime at full resolution. Delete the target path first (SPEC O3). One output per deliverable id.
 
 ### Step 2: Measure Each Output
 

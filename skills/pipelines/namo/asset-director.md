@@ -2,7 +2,7 @@
 
 ## When to Use
 
-You make every stem the episode needs (`pipeline_defs/namo-webshow.yaml`, stage `assets`) from the approved `scene_plan` and `script`, and prove each one is right by measurement. CPU work (ink-wash renders, voice) runs here on the runner; GPU work (H3 clips, music stems) is outsourced and comes back as raw, separated, named stems. **GPU returns stems; it never mixes, narrates, grades or concatenates** (`GPU_CONTRACT.principle`). This is the only stage that spends money.
+You make every stem the episode needs (`pipeline_defs/namo-webshow.yaml`, stage `assets`) from the approved `scene_plan` and `script`, and prove each one is right by measurement. CPU work (ink-wash renders, voice) runs here on the runner. GPU work (MiniMax H3 shots) is never made through the engine: namo-studio makes it (`manufacture/namo_pod_run.py`, see namo-studio `FACTORY_MANUAL.md`) and publishes raw shots to R2 `render/<ep>/shots/`. **GPU returns shots; it never mixes, narrates, grades or concatenates.**
 
 ## Prerequisites
 
@@ -10,9 +10,9 @@ You make every stem the episode needs (`pipeline_defs/namo-webshow.yaml`, stage 
 |-------|----------|---------|
 | Schema | `schemas/artifacts/asset_manifest.schema.json` | Artifact validation |
 | Prior artifacts | `scene_plan` (`metadata.namo.shots[]`: runtime per shot), `script` (lines, measured timings) | What to make |
-| Engine | `python namo/engine.py render <job.json>` — the only door to a runtime (SPEC R2); `mg` returns a verified film, `h3` returns stems (`namo/namo_gpu.py`) | Rendering |
-| Contracts | `GPU_CONTRACT.json` (`gpu_outputs`, `format_rules`, `acceptance`), `PROVISIONING_RULES.json` (`hard_rules`, `cost_ceilings`, `boot_timeout_by_image`, `forbidden`) | Stem spec, GPU spend |
-| Tools | `tts_selector`, `image_selector`, `video_selector`, `music_gen` (yaml `tools_available`) | Keyframes, music when not on the GPU session |
+| Engine | `python namo/engine.py render <job.json>` — the only door to a runtime (SPEC R2); runtimes are `mg` (verified film) and `rd` only | Rendering |
+| GPU shots | namo-studio `manufacture/namo_pod_run.py plans/<ep>.json` (rules in namo-studio `FACTORY_MANUAL.md`) | H3 shots, not made here |
+| Tools | `tts_selector`, `image_selector`, `video_selector`, `music_gen` (yaml `tools_available`) | Keyframes, music |
 | Voice | piper `hi_IN-pratham-medium` (`.voices/`) | Narration stems |
 
 ## Output Artifact: `asset_manifest`
@@ -22,9 +22,9 @@ One `assets[]` entry per file. Closed schema: per-file checks go in `metadata.na
 | Field | Content |
 |-------|---------|
 | `id` | `<SHOT>_video`, `<SHOT>_vo`, `<THEME>_s<SEED>`, … |
-| `type` | `video` (h3 clip), `animation` (mg film/shot), `narration`, `music`, `sfx`, `image` (keyframe) |
-| `path` | GPU: `render/<ep>/shots/<SHOT>.mp4`, `render/<ep>/music/<THEME>_s<SEED>.wav`; mg: the engine's output film |
-| `source_tool` | `engine.mg`, `engine.h3`, `piper`, `music_gen`, `image_selector` |
+| `type` | `video` (H3 shot from namo-studio), `animation` (mg film/shot), `narration`, `music`, `sfx`, `image` (keyframe) |
+| `path` | GPU: `render/<ep>/shots/<SHOT>.mp4` (R2); music: the score library `music/lib/<stem>.wav` (namo-studio `MUSIC_LIB.json`); mg: the engine's output film |
+| `source_tool` | `engine.mg`, `namo-studio.h3`, `piper`, `music_gen`, `image_selector` |
 | `scene_id` | Shot id |
 | `model`, `seed`, `provider` | From the stem's `<SHOT>.json` meta (`graph`, `seed`, `gpu`) |
 | `cost_usd` | Measured spend for that file (0 for CPU) |
@@ -37,39 +37,38 @@ One `assets[]` entry per file. Closed schema: per-file checks go in `metadata.na
 
 ### Step 1: Inventory and Estimate
 
-List every stem the scene plan needs, grouped by runtime. Cost = Σ(h3 shot seconds) × `0.00039` (`H3Runtime.cost_per_sec_usd`) + boot/pod overhead at the chosen GPU's `price_hr` from `PROVISIONING_RULES.candidate_order`. If the estimate exceeds the showrunner's remaining budget, `cost_ceilings.per_episode_usd`, or the account balance, stop before renting and report the numbers. `session_policy` plans ≥ 8 episodes per pod run; a single-episode rent is a showrunner decision, logged.
+List every stem the scene plan needs, grouped by runtime. CPU stems cost 0. H3 shots are namo-studio's spend, not this stage's: cost per episode = pod hours × the pod's price (RTX PRO 6000 ~$2.49/h; boot 9–19 min, ~80–110 s per shot turbo), never per second. If the H3 shots are not already in R2 `render/<ep>/shots/` and the estimate exceeds the showrunner's remaining budget, stop and report the numbers.
 
 ### Step 2: CPU Stems First (free)
 
 1. **Ink-wash (`mg`)**: write the job (`namo.job/1`: `kind: webshow`, `runtime: mg`, `scene`, `seconds`, `fps: 24`, `ratio`, `style: namo-vedic-ink`, `voice`) and run `python namo/engine.py render job.json`. Only `PASS` (from `verify_video`: size, duration within 2 %, zero blank frames, audio not silent) counts.
 2. **Narration**: one piper WAV per narrator line (`engine.speak()`), duration measured and compared to the script's `speech_s`. A line > 1.15× its slot → send back to script.
-3. **Keyframes** for h3 shots (`image_selector`): prompt = `SHOW_BIBLE` + character identity + framing (`casting_rule`: no character from its own prompt alone), plus `negative_prompt`. Every prompt names fire, props, ground.
+3. **Keyframes** for H3 shots are made in namo-studio (`keyframes-r2.yml`, prompts from namo-studio `manufacture/SHOW_BIBLE.json` + `CAST_WEIGHTAGE.json`), not here.
 
-### Step 3: GPU Stems (paid) via the `h3` Runtime
+### Step 3: GPU Stems (paid) — namo-studio only
 
-Only through `python namo/engine.py render` with `runtime: h3` (it dispatches `namo/namo_gpu.py`). Provisioning rules as written:
+Never through `namo/engine.py`. H3 shots are rendered by namo-studio `manufacture/namo_pod_run.py plans/<ep>.json` after `dryrun.yml` (CPU ComfyUI) has validated every graph, into namo-studio `out/<ep>/shots/`; R2 `render/<ep>/shots/` is where this stage reads them (no uploader exists yet — namo-studio `FACTORY_MANUAL.md`, gaps). Its rules, as written there:
 
-- No pod without a named GPU type, a named datacenter and a precomputed max cost (R1).
-- A pod that has not reported uptime within `boot_timeout_by_image` is deleted at once — a pod is born only when it will boot.
-- Never a GPU from `forbidden.gpus_documented` for a render (24–48 GB cannot hold the 52.3 GB weights).
-- A pod that booted and then hits an error is held and the fix resumes on it; it is released after 30 continuous minutes with no render and no log change.
-- When this stage completes, list the provider's pods (`GET https://rest.runpod.io/v1/pods`, key from env `RUNPOD_KEY`, never printed): `pods_alive_after` must be empty.
+- One pod session per run; global weights volume `namo-weights-global`.
+- Budget floor `NAMO_BUDGET_FLOOR` (default $0.25): the run stops and keeps the shots made so far.
+- A pod is never released on an error: it is held for the fix and resumed on; the in-pod watchdog releases it after 30 min idle.
+- On success the pod is released at once (unless `NAMO_KEEP_POD=1`): `pods_alive_after` must be empty.
 
 ### Step 4: Verify Every Stem
 
-Video (`GPU_CONTRACT.acceptance.shot`):
+Video (H3 shots):
 
 ```
 ffprobe -v error -select_streams v:0 -show_entries stream=codec_name,pix_fmt,width,height,r_frame_rate,nb_frames:format=duration -of json <SHOT>.mp4
 ```
 
-Must be `h264`, `yuv420p`, `480x864`, `24/1`, frames as the meta says, duration within 0.2 s of spec. Black check:
+Must be `h264`, `yuv420p`, `768x1344`, `24/1`, frames on the 17k+5 grid as the meta says, duration within 0.2 s of spec. Black check:
 
 ```
 ffmpeg -v error -i <SHOT>.mp4 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null -
 ```
 
-`max(YAVG) <= 17` is a flat-black shot (int8 video VAE renders black — fp16 VAE only). Music (`acceptance.music`): 48 kHz (`ffprobe` `sample_rate`), `volumedetect` `max_volume <= -6.0 dB`, not silent. Then `sha256sum -c SHA256SUMS` inside `render/<ep>/` — every line `OK`.
+`max(YAVG) <= 17` is a flat-black shot (int8 video VAE renders black — fp16 VAE only). Music: 48 kHz (`ffprobe` `sample_rate`), `volumedetect` `max_volume <= -6.0 dB`, not silent. Then `sha256sum -c SHA256SUMS` inside `render/<ep>/` — every line `OK`.
 
 ### Step 5: Submit
 
@@ -83,13 +82,13 @@ Validate the manifest against the schema. Self-check:
 
 ## Refuse / Fail When
 
-- Any stem fails acceptance: `GPU_CONTRACT.acceptance.total` — "CPU refuses to assemble if any shot fails acceptance". Re-render that shot (same seed and graph first); do not hand a failed stem to edit.
-- A GPU run returns mixed, narrated, graded, texted or concatenated output: that is a contract defect (`format_rules.no_gpu_mixing`), not a usable asset.
-- The estimate exceeds budget or a provisioning ceiling.
-- `RUNPOD_KEY` is unset or the provider is unreachable when an `h3` shot is required: the stage fails naming the shot; no substitution with another look.
+- Any stem fails acceptance: do not assemble. Re-render that shot (same seed and graph first; H3 shots in namo-studio); do not hand a failed stem to edit.
+- A GPU run returns mixed, narrated, graded, texted or concatenated output: that is a defect, not a usable asset.
+- The estimate exceeds budget.
+- An H3 shot is required and not in R2 `render/<ep>/shots/`: the stage fails naming the shot; no substitution with another look, and no GPU rental from the engine.
 
 ## Common Pitfalls
 
 - **Trusting the spec instead of ffprobe.** The manifest records what was measured.
-- **Deleting a booted pod on the first error.** Fix and resume on the same pod; the weights download is the expensive part.
+- **Renting a GPU from the engine.** H3 shots are namo-studio's; the engine has no GPU runtime.
 - **Grading or mixing on the GPU "to save a step".** CPU does all of it.

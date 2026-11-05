@@ -93,7 +93,6 @@ The elephant never edits these. If a fix seems to need a change here, that is an
 and the question goes to the owner:
 
 - `SPEC.md` — the contract itself. Only the owner changes the contract.
-- `namo/GPU_CONTRACT.json`, `namo/PROVISIONING_RULES.json`, `namo/SHOW_BIBLE.json`
 - `pipeline_defs/*.yaml` — only the owner adds or removes a pipeline
 - `program.md` — this file
 

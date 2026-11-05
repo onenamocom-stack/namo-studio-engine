@@ -1,24 +1,23 @@
 # NAMO — webshow episode (Mahabharata / Gita). The show that already exists.
 # Inherits the animated-explainer contract, but every visual and audio stage is pinned to
-# NAMO's own contract files (SHOW_BIBLE, GPU_CONTRACT, PROVISIONING_RULES) so the
-# engine never wanders into a generic "AI explainer" look.
+# NAMO's show contracts in namo-studio (manufacture/SHOW_BIBLE.json, CAST_WEIGHTAGE.json) so the
+# engine never wanders into a generic "AI explainer" look. GPU (MiniMax H3) episodes are made only
+# by namo-studio (manufacture/namo_pod_run.py, FACTORY_MANUAL.md); this pipeline is CPU (mg) only.
 name: namo-webshow
 version: "1.0"
 description: >
   A NAMO episode: one shloka, one chapter, one 60-second film. Research is the DCS corpus,
   not the web. Visuals come from the show bible (late Vedic Iron Age, fire-lit, ochre/teal),
-  never from a generic style prompt. GPU is outsourced and returns raw stems; CPU composes.
+  never from a generic style prompt. CPU only here; H3/GPU episodes are made by namo-studio.
 category: show
 stability: production
 
 inherits: animated-explainer
 
 # ---- authority: these files win over any playbook ----
-contracts:
+contracts:                                 # paths in namo-studio (the engine keeps none)
   bible: manufacture/SHOW_BIBLE.json
-  gpu: manufacture/GPU_CONTRACT.json
-  provisioning: manufacture/PROVISIONING_RULES.json
-  corpus: corpus/mahabharatam.txt          # DCS, CC-BY 4.0, fetched by the workflow
+  corpus: corpus/mahabharatam.txt          # DCS, CC-BY 4.0, fetched by namo-studio namo-check.yml
   episode_dir: show/{ep}/
   shots: show/{ep}/shots.json              # the shot list is authored, not generated
 
@@ -32,7 +31,7 @@ orchestration:
 compatible_playbooks:
   recommended:
     - namo-vedic-ink          # mg/storyboard ink-wash
-    - namo-vedic-painted      # H3 2.5D painted plates
+    - namo-vedic-painted      # 2.5D painted plates (plate, once registered)
   custom_allowed: false       # the show has ONE look. Do not let a run invent another.
 
 stages:
@@ -69,7 +68,7 @@ stages:
       it assigns each shot to a runtime and a style.
     runtimes:
       mg:     ink-wash vector (lemo engine, CPU, ~0.04 s/frame)
-      h3:     MiniMax H3 image-to-video (GPU, outsourced, 5 s clips)
+      # H3 (MiniMax image-to-video, GPU) is not an engine runtime; namo-studio makes H3 shots.
       plate:  still image + 2.5D camera move (CPU)
     success_criteria:
       - Every shot in shots.json has a runtime assigned
@@ -82,11 +81,9 @@ stages:
     produces: [asset_manifest]
     tools_available: [tts_selector, image_selector, video_selector, music_gen]
     note: >
-      GPU work is dispatched through manufacture/namo_gpu.py under PROVISIONING_RULES.
-      A pod is born only when it will boot and dies the moment it will not.
-      CPU work (mg render, voice, mix) runs here on the runner.
+      CPU only: mg render, voice, mix run here on the runner. The engine rents no GPU;
+      H3 shots (768x1344, 24 fps, RunPod) are made by namo-studio manufacture/namo_pod_run.py.
     success_criteria:
-      - Every stem matches GPU_CONTRACT.gpu_outputs exactly (480x864, h264, 24fps)
       - SHA256SUMS present and verified
       - No pod left alive after the stage
       - mg shots rendered by the lemo engine, YAVG checked (not just "file exists")

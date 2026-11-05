@@ -27,10 +27,12 @@ resolve settles findings. `namo/drift.py` is the automated half of drift-report.
 ## Engines
 | runtime | kind | cost | what |
 |---|---|---|---|
-| mg | cpu | 0 | vector motion graphics (lemo, 68 styles, via ft-motion) |
-| h3 | gpu | $0.00039/s | MiniMax H3 image-to-video (outsourced) |
+| mg | cpu | 0 | lemo ink-wash motion graphics (webshow cards, `namo/mg/scenes/`) |
+| rd | cpu | 0 | rendiv explainers (`namo/rd/beats/`) |
+
+GPU (MiniMax H3) episodes are not an engine runtime: they are made by
+`onenamocom-stack/namo-studio`. The operating manual for both repos is
+`namo-studio/FACTORY_MANUAL.md`.
 
 ## Current state
-Read `SPEC.md` -> "Known drift". Last measured: `agent.py` borrows the webshow scene for
-every kind (D4), 15 pipeline skill references have no file (D1-D3), R2 creds return 401 (D5).
-The studio is being built, not finished.
+`HANDOFF.md` (engine notes) and `SPEC.md` -> "Known drift".

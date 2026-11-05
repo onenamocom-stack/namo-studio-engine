@@ -25,7 +25,7 @@ You package an approved episode for the owner (`pipeline_defs/namo-webshow.yaml`
 - `description`: the hook in Hindi, then the spoken verses (Devanagari + verse id), then credits:
   - "Sanskrit text: GRETIL e-text of the BORI critical edition."
   - "Word data: Digital Corpus of Sanskrit (DCS), CC-BY 4.0." (attribution is a licence condition)
-  - If any `asset_manifest` asset has `source_tool: engine.h3`: "Video generated with MiniMax H3. This film contains AI-generated content." (H3 licence: commercial use must show "MiniMax H3" and disclose AI generation.)
+  - If any `asset_manifest` asset has `source_tool: namo-studio.h3`: "Video generated with MiniMax H3. This film contains AI-generated content." (H3 licence: commercial use must show "MiniMax H3" and disclose AI generation.)
 - `tags` / `hashtags`: names and places that actually occur in the verses (from `research_brief.metadata.namo.lemmas`), plus `Mahabharata`, `Bhagavad Gita` where true. No trend-bait.
 - `chapters`: none for a sub-2-minute episode.
 
