@@ -56,7 +56,12 @@ def run_job(job):
     if not ok:
         rec.update(state="BLOCKED", reason=why, seconds=round(time.time()-t0,1)); return rec
     plan["scene"] = plan.get("scene") or router.SCENE_FOR_KIND[plan["kind"]]
-    res = router.render(plan)
+    try:
+        res = router.render(plan)
+    except Exception as e:
+        rec.update(state="CRASHED", reason="%s: %s" % (type(e).__name__, str(e)[:400]),
+                   trace=traceback.format_exc()[-1400:], seconds=round(time.time()-t0, 1))
+        return rec
     if res.get("ok"): rec.update(state="DONE", out=res["out"], guard=res["guard"])
     else: rec.update(state="FAILED", reason=res.get("error"), cmd=res.get("cmd"), cwd=res.get("cwd"),
                    log=(res.get("log") or "")[-1500:])
