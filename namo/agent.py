@@ -190,7 +190,7 @@ def render(p):
     res = rt.render(job, OUT)
     if not res.get("ok"):
         return {"ok": False, "error": res.get("error") or "render failed", "log": res.get("log", "")[-1500:]}
-    good, msg = engine.verify_video(res["out"], p["seconds"], p["voice"])
+    good, msg = engine.verify_video(res["out"], p["seconds"], p["voice"], res.get("voice"))
     return {"ok": good, "out": res.get("out"), "guard": msg, "audio": res.get("audio"), "error": None if good else msg}
 
 def main():

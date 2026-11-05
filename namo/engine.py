@@ -56,7 +56,7 @@ SILENT_MEAN_DB = -50.0     # SPEC §4: an audio track whose mean volume is below
 # (laptop: user login; Actions: keyless WIF as the TTS-only service account). A line may be sped
 # up to fit its slot by at most ATEMPO_MAX; beyond that the job fails - never overlap, never truncate.
 VOICES = ROOT / ".voices"
-DEFAULT_VOICE = {"engine": "chirp3", "id": "hi-IN-Chirp3-HD-Kore"}   # probe + fitbeats default
+DEFAULT_VOICE = {"engine": "chirp3", "id": "hi-IN-Chirp3-HD-Kore"}   # fitbeats default
 ATEMPO_MAX = 1.15
 VOICE_ID = {
     "piper": re.compile(r"[a-z]{2,3}_[A-Z]{2}-\w+-\w+"),           # <lang>_<REGION>-<name>-<quality>
@@ -77,6 +77,7 @@ EDGE_STRIP = ("silenceremove=start_periods=1:start_threshold=-50dB,areverse,"
 # (explainers) film and speech loudness are the same. AAC overshoots the PCM peak, so the encoded film
 # is measured and re-limited once.
 LUFS = -16.0            # speech loudness (R128 integrated of the mastered voice), mobile-first
+LUFS_TOL = 1.0          # LU: compose and verify_video reject speech outside LUFS +/- LUFS_TOL
 TP_MAX = -1.5           # dBTP, measured on the encoded film
 TP_CEIL = -2.5          # limiter ceiling before AAC (namo_studio measured +1.2 dB AAC overshoot)
 VOICE_CHAIN = ("highpass=f=80,"
@@ -353,22 +354,6 @@ def voice_for(vid):
     return {"engine": eng, "id": vid} if eng else None
 
 
-def probe_voice():
-    """(ok, msg). Every job carries a voice (SPEC §2): a runtime that cannot speak cannot make a film."""
-    say, err = speaker(DEFAULT_VOICE)
-    if err:
-        return False, "voice: " + err
-    tmp = Path(tempfile.mkdtemp(prefix="namo-probe-voice-"))
-    try:
-        # a sentence, not one word: Chirp3 answered "नमो" alone with a clip of pure silence 1 time in 3
-        secs, err = say("नमस्ते, यह नमो है।", tmp / "probe.wav")
-    finally:
-        shutil.rmtree(tmp, ignore_errors=True)
-    if err:
-        return False, "voice %s: %s" % (DEFAULT_VOICE["id"], err)
-    return True, "voice %s spoke %.2fs" % (DEFAULT_VOICE["id"], secs)
-
-
 def fit_beats(path, voice=DEFAULT_VOICE, rate=1.0, pad=0.4):
     """
     Retime an rd beats file so every beat's `vo` line fits its beat when spoken by `voice` at
@@ -410,15 +395,24 @@ def fit_beats(path, voice=DEFAULT_VOICE, rate=1.0, pad=0.4):
     return rows, None
 
 
-def ebur128(path):
-    """(I LUFS, LRA LU, true peak dBTP) of the first audio stream, or None if ffmpeg cannot measure it."""
+def ebur128(path, pre=""):
+    """(I LUFS, LRA LU, true peak dBTP) of the first audio stream, or None if ffmpeg cannot measure it.
+    `pre` is a filter chain run before the meter (ending in a comma)."""
     r = subprocess.run([which("ffmpeg"), "-hide_banner", "-nostats", "-i", str(path), "-map", "0:a:0",
-                        "-af", "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True)
+                        "-af", pre + "ebur128=peak=true", "-f", "null", "-"], capture_output=True, text=True)
     s = (r.stderr or "")[(r.stderr or "").rfind("Summary:"):]
     got = [re.search(k + r":\s+(-?[\d.]+|-inf)", s) for k in ("I", "LRA", "Peak")]
     if r.returncode != 0 or not all(got):
         return None
     return tuple(float(m.group(1).replace("-inf", "-120")) for m in got)
+
+
+def speech_lufs(path, lines):
+    """R128 integrated loudness of `path` gated to the spoken VO windows (build_voice report:
+    t .. t+placed), or None. The bed sits BED_UNDER_VOICE_DB under the speech there, so this is
+    the speech loudness the listener hears, whatever the bed adds in the pauses."""
+    sel = "+".join("between(t,%.3f,%.3f)" % (l["t"], l["t"] + l["placed"]) for l in lines)
+    return ebur128(path, "aselect='%s'," % sel)
 
 
 def compose(silent, mix, out, fps, bed, work):
@@ -429,6 +423,7 @@ def compose(silent, mix, out, fps, bed, work):
     sits at LUFS in every film whatever the bed adds in the pauses; then it is muxed under the picture
     (fps, AAC). If AAC pushed the film's true peak over TP_MAX, the master is re-limited lower by the
     overshoot and the audio re-muxed once (picture copied).
+    Speech that misses LUFS by more than LUFS_TOL after the last limiter pass fails the job.
     Returns ({I, LRA, TP of the film, speech: LUFS of the mastered voice}, err).
     """
     ff = which("ffmpeg")
@@ -460,32 +455,40 @@ def compose(silent, mix, out, fps, bed, work):
             return None, "bed mix: " + err
 
     def master(ceil):
-        """(master.wav, speech LUFS, err)"""
+        """(master.wav, speech LUFS, err). The LUFS returned is measured after the last gain change."""
         dst = work / "master.wav"
         limit = lambda src, g: run("-i", src, "-af", "volume=%.3fdB,aresample=%d,alimiter=limit=%.5f:level=false:"
                                    "attack=1:release=60,aresample=%d" % (g, SR * 4, 10 ** (ceil / 20), SR),
                                    "-c:a", "pcm_f32le", dst)
         gain = LUFS - lv[0]
-        for _ in range(4):        # the limiter takes a little loudness; correct what it took
+        for n in range(4):        # the limiter takes a little loudness; correct what it took
             err = limit(voice, gain)
-            if err:
-                return None, None, "master: " + err
-            i = ebur128(dst)[0]
-            if abs(i - LUFS) < 0.1:
+            got = None if err else ebur128(dst)
+            if not got:
+                return None, None, "master: " + (err or "the limited voice cannot be measured")
+            i = got[0]
+            if abs(i - LUFS) < 0.1 or n == 3:
                 break
             gain += LUFS - i
+        if abs(i - LUFS) > LUFS_TOL:
+            return None, i, ("master: speech is %.1f LUFS after 4 limiter passes, outside %.0f +/- %.0f: its crest "
+                             "is too high for a %.1f dBTP ceiling" % (i, LUFS, LUFS_TOL, ceil))
         err = limit(pre, gain) if pre != voice else None
         return dst, i, ("master: " + err) if err else None
 
     aac = ["-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", "-shortest"]
     m, speech, err = master(TP_CEIL)
-    err = err or run("-i", silent, "-i", m, "-map", "0:v", "-map", "1:a", "-vf", "fps=%d,format=yuv420p" % fps,
-                     "-c:v", "libx264", "-preset", "slow", "-crf", "19", "-r", fps, *aac, out)
+    if err:
+        return None, err
+    err = run("-i", silent, "-i", m, "-map", "0:v", "-map", "1:a", "-vf", "fps=%d,format=yuv420p" % fps,
+              "-c:v", "libx264", "-preset", "slow", "-crf", "19", "-r", fps, *aac, out)
     lf = None if err else ebur128(out)
     if lf and lf[2] > TP_MAX:
         m, speech, err = master(TP_CEIL - (lf[2] - TP_MAX) - 0.3)
+        if err:
+            return None, err
         redo = work / "redo.mp4"
-        err = err or run("-i", out, "-i", m, "-map", "0:v", "-map", "1:a", "-c:v", "copy", *aac, redo)
+        err = run("-i", out, "-i", m, "-map", "0:v", "-map", "1:a", "-c:v", "copy", *aac, redo)
         if not err:
             os.replace(redo, out)
             lf = ebur128(out)
@@ -593,10 +596,9 @@ class MgRuntime(Runtime):
                     shutil.rmtree(locals().get("outdir", Path("/nonexistent")), ignore_errors=True)
             except Exception as e:
                 return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
-        ok, voiced = probe_voice()
-        if not ok:
-            return False, voiced
-        return True, "engine=%s scenes=%d, chrome ok, one still rendered, %s" % (d.name, len(scenes), voiced)
+        # the voice is not probed here: a job names its own voice and build_voice() checks that
+        # backend first thing at render time, so a missing one fails the job, not the runtime
+        return True, "engine=%s scenes=%d, chrome ok, one still rendered" % (d.name, len(scenes))
 
     def scene_meta(self, scene):
         """Read and validate the scene's own declaration. Fail closed on anything unclear."""
@@ -733,7 +735,7 @@ class MgRuntime(Runtime):
             log += "\naudio: speech %(speech).1f LUFS; film I %(I).1f LUFS, LRA %(LRA).1f LU, TP %(TP).1f dBTP" % audio
             # SPEC §4 / O1: success is not "a file appeared". Verify here, so a caller using
             # REGISTRY directly gets the same guarantee as the CLI.
-            good, msg = verify_video(out, job["seconds"], job["voice"])
+            good, msg = verify_video(out, job["seconds"], job["voice"], lines)
             if not good:
                 return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
             return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log,
@@ -787,10 +789,7 @@ class RdRuntime(Runtime):
                 return False, "render probe error: %s: %s" % (type(e).__name__, str(e)[:120])
             finally:
                 shutil.rmtree(tmp, ignore_errors=True)
-        ok, voiced = probe_voice()
-        if not ok:
-            return False, voiced
-        return True, "beats=%d, 1 s film rendered, %s" % (len(beats), voiced)
+        return True, "beats=%d, 1 s film rendered" % len(beats)
 
     def render(self, job, outdir):
         ok, why = validate_job(job)
@@ -837,7 +836,7 @@ class RdRuntime(Runtime):
             if err:
                 return {"ok": False, "error": err, "log": log[-3000:], "voice": lines}
             log += "\naudio: speech %(speech).1f LUFS; film I %(I).1f LUFS, LRA %(LRA).1f LU, TP %(TP).1f dBTP" % audio
-            good, msg = verify_video(out, job["seconds"], job["voice"])
+            good, msg = verify_video(out, job["seconds"], job["voice"], lines)
             if not good:
                 return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
             return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log, "voice": lines,
@@ -864,11 +863,13 @@ def register_proven():
 
 # ------------------------------------------------------------------ §4 verify
 
-def verify_video(path, seconds, voice=None):
+def verify_video(path, seconds, voice=None, lines=None):
     """
     SPEC §4 / O1-O3. Returns (ok, reason).
     A failure to run a check is a failure: no bare except that returns True.
-    With a voice, the film must also carry an audio stream of the same length that is not silent.
+    With a voice, the film must also carry an audio stream of the same length that is not silent,
+    and its speech - gated to the VO windows in `lines` (the build_voice report) - must sit at
+    LUFS +/- LUFS_TOL. A voiced film without its lines cannot be checked, so it is rejected.
     """
     if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) \
             or not math.isfinite(seconds) or seconds <= 0:
@@ -946,8 +947,17 @@ def verify_video(path, seconds, voice=None):
     if mean < SILENT_MEAN_DB:
         return False, "audio is silent: mean %.1f dB, max %.1f dB (silence is below %.0f dB mean)" % (
             mean, peak, SILENT_MEAN_DB)
-    return True, "%.1fs, %d frames sampled, 0 blank; audio %.1fs, mean %.1f dB, max %.1f dB" % (
-        dur, n, adur, mean, peak)
+    if not lines:
+        return False, "the job has voice %s but no VO line timings were given: cannot check speech loudness" % (
+            voice.get("id"))
+    sl = speech_lufs(p, lines)
+    if not sl:
+        return False, "could not measure the speech loudness over %d VO line(s)" % len(lines)
+    if abs(sl[0] - LUFS) > LUFS_TOL:
+        return False, "speech is %.1f LUFS over its %d VO line(s), outside %.0f +/- %.0f" % (
+            sl[0], len(lines), LUFS, LUFS_TOL)
+    return True, "%.1fs, %d frames sampled, 0 blank; audio %.1fs, mean %.1f dB, max %.1f dB; speech %.1f LUFS" % (
+        dur, n, adur, mean, peak, sl[0])
 
 
 # ------------------------------------------------------------------ §5 pipelines
@@ -1091,7 +1101,7 @@ def main(argv):
         if not res.get("ok"):
             print("RENDER FAILED: %s" % res.get("error"))
             return 1
-        good, msg = verify_video(res["out"], job["seconds"], job["voice"])
+        good, msg = verify_video(res["out"], job["seconds"], job["voice"], res.get("voice"))
         print(("PASS " if good else "REJECT ") + msg)
         return 0 if good else 1
 

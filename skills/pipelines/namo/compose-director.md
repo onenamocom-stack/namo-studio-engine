@@ -11,7 +11,7 @@ You render the finished episode on CPU (`pipeline_defs/namo-webshow.yaml`, stage
 | Schemas | `schemas/artifacts/render_report.schema.json`, `final_review.schema.json` | Artifact validation |
 | Prior artifacts | `edit_decisions`, `asset_manifest`, `script` (target length, lines) | What to render |
 | Tools | `video_compose` (operation `render`/`compose`, `burn_subtitles`), `audio_mixer` (ducking, `loudnorm_target`) — yaml `required_tools` | Render, mix |
-| Engine | `namo/engine.py verify_video(path, seconds, voice)` (SPEC §4) | Acceptance |
+| Engine | `namo/engine.py verify_video(path, seconds, voice, lines)` (SPEC §4; `lines` = the render's `voice` report) | Acceptance |
 | Gate | namo-studio `qa/qa_video.py --lufs -16 --tp -1.5 --expect-cuts` (48 kHz stereo, −16 LUFS integrated, true peak ≤ −1.5 dBTP, planned hard cuts; video h264, yuv420p, 24 fps) | Output spec |
 
 ## Process
@@ -36,10 +36,10 @@ With `video_compose`: concatenate cuts in order (hard cuts between separately re
 |-------|---------|------|
 | Container, codec, size, fps | `ffprobe -v error -show_entries stream=codec_name,pix_fmt,width,height,r_frame_rate,sample_rate,channels:format=duration,size -of json final.mp4` | h264, yuv420p, 24 fps, AAC 48 kHz 2 ch |
 | Duration | from the probe | within 5 % of target (yaml) **and** within `max(0.5, 2 %)` (SPEC §4 — the stricter one decides) |
-| Blank frames | `verify_video(final.mp4, seconds, voice)` — samples 1 fps at 64×36, luma stddev < 1.0 is blank | 0 blank frames |
+| Blank frames | `verify_video(final.mp4, seconds, voice, lines)` — samples 1 fps at 64×36, luma stddev < 1.0 is blank | 0 blank frames |
 | Flat black | `ffmpeg -v error -i final.mp4 -vf signalstats,metadata=print:key=lavfi.signalstats.YAVG:file=- -f null -` | no frame with YAVG ≤ 17; per-shot YAVG has variance (a static black hold is a failure even if one frame is lit) |
 | Loudness | `ffmpeg -nostats -i final.mp4 -af ebur128=peak=true -f null -` | integrated −16 LUFS ± 1; true peak ≤ −1.5 dBTP |
-| Silence | `verify_video` audio report (mean volume above −50 dB) | narration audible |
+| Silence + speech loudness | `verify_video` audio report (mean volume above −50 dB; speech gated to the VO lines at −16 LUFS ± 1) | narration audible, at level |
 | Cuts | namo-studio `qa/qa_video.py final.mp4 --lufs -16 --tp -1.5 --expect-cuts <t1,t2,…>` (cut times from `transitions[]` of type `cut`) | exit 0 |
 | Subtitles | extract a frame at the midpoint of every cue (`ffmpeg -ss <t> -i final.mp4 -frames:v 1 cue_<id>.png`) and inspect | every cue present, inside the frame, Devanagari renders (no tofu boxes), 52 px |
 
