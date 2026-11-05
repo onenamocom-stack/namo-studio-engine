@@ -12,7 +12,8 @@ jobs:
         with: {python-version: "3.11"}
       - name: deps
         run: |
-          sudo apt-get install -y -qq ffmpeg
+          echo "ffmpeg: $(command -v ffmpeg || echo MISSING)"
+          echo "chrome: $(command -v google-chrome || echo MISSING)"
           echo "PLAYWRIGHT_CHROME=$(command -v google-chrome)" >> $GITHUB_ENV
       - uses: actions/cache@v4
         with:
