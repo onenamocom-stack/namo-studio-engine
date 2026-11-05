@@ -217,8 +217,17 @@ class MgRuntime(Runtime):
             return err
         if m["kind"] != job["kind"]:
             return "scene %r is for kind %r, the brief asks for %r" % (scene, m["kind"], job["kind"])
-        if not m.get("applicable", True):
-            return "scene %r declares it cannot apply a plan; re-author it" % scene
+        # An authored scene cannot follow the plan. Accept it only when the brief already
+        # matches what it was authored as; otherwise the result would not match the brief.
+        if not m.get("applicable", False):
+            mismatch = []
+            for k in ("ratio", "seconds", "style", "emotion"):
+                if k in m and m[k] != job.get(k):
+                    mismatch.append("%s %r vs %r" % (k, m[k], job.get(k)))
+            if mismatch:
+                return ("scene %r is authored (%s) and cannot be changed by a plan; "
+                        "brief asks for %s. Re-author the scene, or change the brief."
+                        % (scene, ", ".join(mismatch), job.get("kind")))
         return None
 
     def render(self, job, outdir):
