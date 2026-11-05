@@ -1,0 +1,102 @@
+name: namo-agent
+# One prompt in, one video out. This is the only entry point a human needs.
+on:
+  workflow_dispatch:
+    inputs:
+      prompt:
+        description: "what video do you want? (one line is enough)"
+        required: true
+        default: "make a 30 second explainer about how Jev mode works"
+      seconds: {description: "override length", required: false, default: ""}
+      ratio:   {description: "16:9 | 9:16 | 1:1", required: false, default: ""}
+      dry:     {description: "1 = print the plan, render nothing", required: false, default: ""}
+
+jobs:
+  make:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: "22"}
+      - uses: actions/setup-python@v5
+        with: {python-version: "3.11"}
+
+      - name: system deps
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg chromium-browser || sudo apt-get install -y -qq chromium
+          echo "PLAYWRIGHT_CHROME=$(command -v chromium || command -v chromium-browser)" >> $GITHUB_ENV
+
+      - name: cache engines
+        uses: actions/cache@v4
+        with:
+          path: |
+            ftm
+            lemo
+            .venv
+          key: namo-engines-v2-${{ hashFiles('namo/bootstrap.sh') }}
+
+      - name: bootstrap
+        run: bash namo/bootstrap.sh
+
+      - name: engine probe
+        run: python3 namo/engine.py runtimes --probe
+
+      - name: decide
+        id: decide
+        env:
+          P: ${{ github.event.inputs.prompt }}
+          S: ${{ github.event.inputs.seconds }}
+          R: ${{ github.event.inputs.ratio }}
+        run: |
+          IN="$P"
+          [ -n "$S" ] && IN="$IN $S seconds"
+          [ -n "$R" ] && IN="$IN $R"
+          python3 namo/agent.py --dry "$IN" | tee out_plan.json || true
+          python3 namo/agent.py --dry "$IN" > brief.json 2>/dev/null || cp out_plan.json brief.json
+
+      - name: make the video
+        if: github.event.inputs.dry != '1'
+        env:
+          P: ${{ github.event.inputs.prompt }}
+          S: ${{ github.event.inputs.seconds }}
+          R: ${{ github.event.inputs.ratio }}
+        run: |
+          IN="$P"
+          [ -n "$S" ] && IN="$IN $S seconds"
+          [ -n "$R" ] && IN="$IN $R"
+          python3 namo/agent.py "$IN" || echo "AGENT REPORTED A FAILURE (see guard output above)"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: agent-output
+          path: |
+            out/
+            out_plan.json
+          retention-days: 14
+
+      - name: publish to R2
+        if: success() && inputs.dry != '1'
+        env:
+          R2_AK: ${{ secrets.R2_AK }}
+          R2_SK: ${{ secrets.R2_SK }}
+          R2_EP: ${{ secrets.R2_EP }}
+        run: |
+          [ -z "$R2_AK" ] && { echo "no R2 secrets; artifact only"; exit 0; }
+          pip install -q boto3
+          python - <<'PY'
+          import os, boto3, glob, json
+          s3 = boto3.client("s3", endpoint_url=os.environ["R2_EP"],
+                            aws_access_key_id=os.environ["R2_AK"],
+                            aws_secret_access_key=os.environ["R2_SK"], region_name="auto")
+          plan = {}
+          try: plan = json.load(open("out/plan.json"))
+          except Exception: pass
+          tag = plan.get("kind","video")
+          for f in glob.glob("out/*.mp4"):
+              k = "agent/%s/%s" % (tag, os.path.basename(f))
+              s3.upload_file(f, "namo-media", k, ExtraArgs={"ContentType":"video/mp4"})
+              print("uploaded", k)
+          PY
