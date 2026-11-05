@@ -1,189 +1,55 @@
-# NAMO Studio — handoff for a fresh agent
+# NAMO Studio Engine — notes for a fresh agent
 
-You are taking over a video-production engine. Read this once, then work. It is written so
-that you do not need any conversation history.
-
-Repository: **github.com/onenamocom-stack/namo-studio-engine**
-(older, still useful: `onenamocom-stack/namo-studio` — holds the manufacture contracts and
-the piper/ffmpeg CPU workflow. The engine repo is the one being built now.)
-
----
-
-## 1. What the thing is supposed to do
-
-One line in, one video out.
+**Operating manual (setup, runs, gates, costs, gaps, where things live): `onenamocom-stack/namo-studio` →
+`FACTORY_MANUAL.md`.** `SPEC.md` is the engine's contract. This file keeps only engine-internal facts.
 
 ```
 brief text -> namo/agent.py (router, deterministic) -> plan
-plan       -> namo/engine.py (runtime: mg | rd | h3) -> film or stems
-film       -> namo/engine.py verify_video()          -> accept or reject
-queue      -> namo/factory.py                        -> runs all of the above, unattended
+plan       -> namo/engine.py (runtime: mg | rd)     -> film
+film       -> namo/engine.py verify_video()        -> accept or reject
+queue      -> namo/factory.py                      -> all of the above, unattended -> status.json
 ```
+GPU (MiniMax H3) episodes are not an engine runtime; namo-studio makes them.
 
-Three pipelines are declared: `namo-webshow` (Mahabharata/Gita episodes), `namo-explainer`
-(long-form teaching videos), `namo-customer` (client work). Only the router and the engine
-exist in code; the pipelines are YAML contracts whose skill files are mostly missing.
+## Runner notes (each cost time once)
+- Use the runner's `google-chrome` and export `PLAYWRIGHT_CHROME`; `apt install chromium` pulls snap (+~5 min).
+- ffmpeg from `FedericoCarboni/setup-ffmpeg@v3`; `apt-get install ffmpeg` once took 36 min.
+- `namo/bootstrap.sh` clones `ftm/` (ft-motion, vendors lemo + the p5 animation kit) and `lemo/`; engines are cached on
+  its hash. `rd` uses playwright's own chromium (`npx playwright install chromium`).
+- One render worker per core: 4 browsers on a 2-core runner thrashed.
 
----
+## Why the mastering is what it is
+- Gain is set on the voice alone (speech −16 LUFS), not on the whole film: in `gita-ep01` (~13 % speech) the bed in the
+  pauses passes the R128 gate and chasing −16 integrated cost ~8 dB of limiting on the voice.
+- AAC overshoots the PCM peak (~+1.2 dB): limiter at −2.5 dBTP, the encoded film is measured and re-limited once.
+- A short room reverb lowered the 2–8 Hz envelope modulation (intelligibility proxy) 0.559 → 0.551, so there is none.
+- `namo/audio/tanpura.flac`: seamless 9.85 s loop from our own ACE-Step v1 run (Apache-2.0 model), the seed with the
+  least 1–4 kHz energy.
+- Voice defaults come from a measured Chirp3-HD A/B (evidence: `C:/Projects/namo-review/voice_ab*`): Kore = highest
+  2–5 kHz presence, low sibilance (explainers); Charon = deepest, median F0 84 Hz (shloka/webshow).
 
-## 2. How to run it
-
-### On a GitHub Actions runner (the normal path)
-```
-Actions -> "namo-agent" -> Run workflow -> paste one line -> watch the artifact
-Actions -> "factory"    -> (also runs every 6 hours) -> reads queue.json -> makes it
-```
-Both workflows bootstrap the engines themselves (`namo/bootstrap.sh`), which clones:
-- `ftm/` — imserhatdemir/ft-motion (MIT). It vendors **lemo-opuscar** (68 vector styles) at
-  `ftm/lemo/`, and carries `animation/` — a p5 + p5.brush character kit with 11 mocap clips
-  and spring-physics easing. **This is where "emotion" comes from, in code.**
-- `lemo/` — the engine on its own, for pipelines that do not want the wrapper.
-
-Runner notes that cost time before, do not relearn them:
-- Use the runner's `google-chrome`. Do not `apt install chromium`: it pulls snap and adds
-  ~5 minutes to every run.
-- The engines are cached on `namo/bootstrap.sh`'s hash.
-- `PLAYWRIGHT_CHROME` must be exported; rendering is Playwright-driven.
-
-### On the phone (only for the EGM loop, see section 5)
+## EGM loop (phone only)
+`namo/egm.py` runs Elephant-Goldfish against the phone-local proxy `127.0.0.1:8322` (CLIProxyAPI under proot; CI
+cannot reach it). Goldfish = one call, no history, a spec + 1–3 files; Elephant = same model with context, may patch;
+a patch is kept only if blockers strictly decrease. Budget: one doc + ≤ 3 source files (~20 KB), 3000 tokens, 180 s.
+If the proxy is down, start it as the shell uid (the app uid cannot write `/data/local/tmp/agent/cpa/`):
 ```bash
-cd /data/user/0/com.niki914.zafiro/files/egm_run
-EGM_MODEL=claude-opus-5-5 python3 namo/egm.py --review      # review only
-python3 namo/engine.py probe                                 # what is ready
-python3 namo/engine.py render job.json out                   # one render
-```
-
----
-
-## 3. The contracts (SPEC.md is the authority; this is the summary)
-
-- **§1 Brief** — router derives kind/runtime/style/seconds/ratio/fps/emotion/voice. Same brief
-  must yield the same plan, forever. No model, no network.
-- **§2 Job** — `namo.job/1`. Required: schema, kind, runtime, scene, seconds, fps, ratio,
-  style, emotion, voice, name. `engine.validate_job()` refuses anything incomplete **before**
-  a renderer runs.
-- **§3 Runtime** — a runtime enters `engine.REGISTRY` only if `probe()` proves it works.
-  `mg` = CPU vector, produces a film. `h3` = GPU, produces **stems, not a film**.
-- **§4 Output** — a film is accepted only if `verify_video()` passes: > 20480 bytes, ffprobe
-  duration within 2 % of `seconds`, and **zero blank frames**. A failure to run a check is a
-  rejection, never a pass.
-- **§5 Pipeline** — a pipeline naming a skill with no file is refused by
-  `engine.check_pipeline()`.
-
----
-
-## 4. What is built, what is not — measured, not claimed
-
-Built and verified:
-- `namo/agent.py` — the router. Its decision table is in SPEC §1 and was tested.
-- `namo/engine.py` — job gate, runtime registry, `verify_video()`, `check_pipeline()`.
-- `namo/factory.py` — reads `queue.json`, plans, checks feasibility, renders, verifies,
-  writes `status.json`. An infeasible job is marked BLOCKED **with the reason**.
-- `namo/drift.py` — checks the repo against SPEC.md, fails CI.
-- `.github/workflows/` — `namo-agent` (one prompt), `factory` (cron + dispatch), `drift`.
-- `skills/egm/` — Google's Elephant-Goldfish Model skills (Apache-2.0).
-
-Built 6 Nov (laptop OMP, after the phone went offline):
-- **D6b closed** for `gita-ep01`: the scene applies `seconds` (20–180, story time-scaled) and `ratio`
-  (16:9 / 9:16 / 1:1, cover-crop around each shot's subject) and exposes `window.VO`.
-- **Voice**: piper (`hi_IN-pratham-medium`) speaks `window.VO`, placed at each line's time (≤1.15x
-  speed-up, else the job fails), muxed with lemo `mux.sh`; `verify_video` requires a non-silent audio
-  stream when the job has a voice. Devanagari font `NotoSerifDeva` (namo/mg/fonts.css, fetched by bootstrap).
-- Explainer `beat-director` skill written; the explainer pipeline passes `check_pipeline`.
-- **Voice + mastering** (6 Nov, owner: "audio could be more ear-pleasing"): `voice.engine` `chirp3` =
-  Google Cloud TTS `hi-IN-Chirp3-HD-<Name>` (token from `gcloud auth print-access-token`; Actions: WIF
-  provider `namo-studio-engine` as the TTS-only SA `namo-tts-ci`); `piper` unchanged. No fallback voice.
-  Defaults from a measured A/B (`out-smoke/voice_ab/ab.mp3` + `ab.txt` + `measure.json`, made by
-  `ab.py`): explainer **Kore** (highest 2-5 kHz presence, low sibilance, rate 0.95 via `emotion: calm`),
-  shloka/webshow **Charon** (deepest, median F0 84 Hz). The engine now masters and muxes itself
-  (`compose()`, lemo `mux.sh` no longer used): HPF 80 Hz, de-ess, 2.5:1 comp, +2 dB @ 3 kHz, gain set on
-  the voice alone (speech -16 LUFS) through a 4x-oversampled limiter, <= -1.5 dBTP on the encoded film.
-  Not -16 on the whole film: in gita-ep01 (~13 % speech) the bed in the pauses passes the R128 gate, and
-  chasing -16 integrated cost ~8 dB of limiting on the voice. A short room reverb lowered the
-  2-8 Hz envelope modulation (intelligibility proxy) 0.559 -> 0.551, so there is none. Optional `bed`:
-  `namo/audio/tanpura.flac`, a seamless 9.85 s loop cut from namo-studio `out/ep01/music/open_s33.wav`
-  (our own ACE-Step v1 3.5B run, Apache-2.0 model; tags "tanpura drone, low cello, bansuri"), the seed
-  with the least 1-4 kHz energy (-29 dB), sidechain-ducked 22 dB under the speech.
-- factory.yml: `FedericoCarboni/setup-ffmpeg@v3` replaces `apt-get install ffmpeg`, which took 36 min
-  of the hour-long run 42107269065.
-
-Not built (the actual backlog):
-- **Explainer runtime `rd`** (6 Nov): rendiv (`namo/rd/`, `@rendiv/*` 0.2.6 from npm), data-driven beats
-  (`namo/rd/beats/*.json`), style measured from three Codacus videos (`namo/rd/STYLE.md`), piper voice,
-  `engine.py fitbeats` fits narration to beats. Still short of Codacus: no sfx, no illustrated/3D scenes,
-  reveals not synced to spoken words.
-- The 17 webshow/customer skills exist (6 Nov) but the two yamls disagree with namo-studio ep01 v2 in 9
-  places (5 s clips vs 7.3 s shots, 480x864 vs 768x1344 stems, piper vs Chirp3-HD voices, a mandatory ink
-  shot, deleted `namo_gpu.py`/`PROVISIONING_RULES.json`, missing playbooks, teal vs "NO teal-orange", no
-  `plate` runtime). The yamls must be brought to v2 before the webshow pipeline drives H3.
-- No pipeline loader: nothing reads `pipeline_defs/*.yaml` at runtime.
-- R2 publish needs working credentials (`R2_AK/R2_SK/R2_EP` in repo secrets).
-
----
-
-## 5. The EGM loop — how review works here
-
-`namo/egm.py` runs the Elephant-Goldfish protocol against the **phone-local** proxy
-(`127.0.0.1:8322`, CLIProxyAPI under proot, models from the owner's subscriptions). CI cannot
-reach it, so this runs from the phone, not from Actions.
-
-- **Goldfish** = one call with **no conversation history**, given a spec and 1-3 files. It
-  cannot know author intent, so it cannot forgive an unstated assumption.
-- **Elephant** = the same model with context, allowed to write code.
-- The loop keeps a patch only if blockers strictly decrease; otherwise it reverts.
-
-Budget rules that exist because they were violated: one document + at most three source files
-per call (~20 KB), 3000 tokens for a review, 180 s timeout. A 54 KB corpus once produced a
-23,000-token prompt and a timeout.
-
-**If the proxy is down**, start it as the shell uid, not the app uid — the app uid cannot write
-`/data/local/tmp/agent/cpa/`:
-```bash
-# as shizuku/shell:
 cd /data/local/tmp/agent && nohup env LD_LIBRARY_PATH=$PWD/proot \
   PROOT_LOADER=$PWD/proot/loader PROOT_TMP_DIR=$PWD/tmp \
   SSL_CERT_FILE=$PWD/proot/ca-bundle.crt \
   $PWD/proot/proot -b $PWD/proot/resolv.conf:/etc/resolv.conf \
   $PWD/np/cli-proxy-api -config $PWD/cpa/config8322.yaml >> $PWD/cpa/proxy8322.log 2>&1 &
 ```
-Key: `zafiro-local-key` (in `cpa/config8322.yaml`).
+Key name: `zafiro-local-key` (in `cpa/config8322.yaml`).
 
----
+## Tried and rejected — do not repeat
+- Prompting a video with an LLM; Jev/agentic browser as renderer (~2 s/frame, not deterministic).
+- Manim (math-only), Remotion (free only ≤ 3 employees), `stillmotion`, `html-to-video-skill`, `ft-motion` alone.
+- `thecodacus/rendiv` was adopted as `rd` for explainers; `mg` stays for ink-wash cards.
 
-## 6. What has already been tried and rejected — do not repeat
-
-- **Prompting a video with an LLM.** Not deterministic, not frame-exact, not cheap.
-- **Jev/agentic browser as the renderer.** Interactive, ~2 s per frame, no determinism.
-  Jev belongs in the *decision* layer, and that layer is already a deterministic router.
-- **Manim / Remotion.** Remotion is free only ≤3 employees; Manim is math-specific.
-- **`ft-motion` alone, `lemo` alone, `stillmotion`, `html-to-video-skill`.** `ft-motion` is the
-  superset (it vendors lemo and adds the animation kit). The other two are minimal or
-  redundant.
-- **`thecodacus/rendiv`** — the tool behind the reference video's *style*, React + `useFrame()`,
-  Apache-2.0. **Adopted 6 Nov as runtime `rd` for explainers**; `mg` stays for the ink-wash webshow cards.
-- **OpenMontage (AGPL)** is the base for the 13 pipelines and 157 skills. The fork is
-  `namo-studio-engine`.
-
----
-
-## 7. Ground rules for whoever picks this up
-
-1. **Never claim a film passed without `verify_video()` output.** A blank film once shipped
-   as "success" because a file existed.
-2. **Do not weaken a check to make a finding disappear.** If `verify_video` is too strict, fix
-   the threshold; never `except: return True`.
-3. **Do not create a second repo or a second tool.** Check what exists first; the owner has
-   corrected this twice.
-4. **A runtime that cannot honour the brief must refuse the job.** Rendering the wrong film is
-   worse than rendering nothing.
-5. **Run the goldfish before saying "done."** It has caught every real bug so far, including
-   ones introduced by the fix for the previous bug.
-
----
-
-## 8. Immediate next steps, in order
-
-1. Explainer polish: sfx on reveals, reveals synced to word timings, illustrated scenes.
-2. Bring `namo-webshow.yaml` / `namo-customer.yaml` in line with namo-studio ep01 v2 (see §4).
-3. Add the pipeline loader that calls `check_pipeline()`.
-4. Restore R2 publish with fresh credentials.
+## Ground rules
+1. Never claim a film passed without `verify_video()` output.
+2. Never weaken a check to make a finding disappear; fix the threshold, never `except: return True`.
+3. No second repo or second tool: check what exists first.
+4. A runtime that cannot honour the brief refuses the job.
+5. Run `python namo/drift.py` (and the goldfish when the phone is up) before saying "done".
