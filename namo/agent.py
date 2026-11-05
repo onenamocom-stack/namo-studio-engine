@@ -90,14 +90,29 @@ def classify(text):
         if s > score: best, score = kind, s
     return best, score
 
+def declared_kind(scene):
+    """The kind a scene declares for itself (rd beats file or mg scene.json), or None."""
+    for f in (NAMO / "rd" / "beats" / f"{scene}.json", NAMO / "mg" / "scenes" / scene / "scene.json"):
+        if f.is_file():
+            return json.loads(f.read_text(encoding="utf-8")).get("kind")
+    return None
+
 def plan(brief):
     if isinstance(brief, str): brief = {"prompt": brief}
     text = brief.get("prompt", "")
-    kind, hit = classify(text)
+    # `key=value` selectors pick, they do not describe: keep them out of classification
+    # ("scene=gita-1-1" would add a webshow 'gita' hit)
+    sel = dict(re.findall(r"\b(\w+)=([\w.-]+)", text))
+    prose = re.sub(r"\b\w+=[\w.-]+", " ", text)
+    scene = brief.get("scene") or sel.get("scene")
+    kind, hit = classify(prose)
+    declared = declared_kind(scene) if scene else None
+    if declared in KINDS:          # a named scene's own kind beats keyword guessing
+        kind = declared
     spec = KINDS[kind]
-    seconds = int(brief.get("seconds") or read_seconds(text))
-    ratio = brief.get("ratio") or read_ratio(text) or spec["ratio"]
-    emotion = brief.get("emotion") or read_emotion(text) or spec["emotion"]
+    seconds = int(brief.get("seconds") or read_seconds(prose))
+    ratio = brief.get("ratio") or read_ratio(prose) or spec["ratio"]
+    emotion = brief.get("emotion") or read_emotion(prose) or spec["emotion"]
     style = brief.get("style") or spec["style"]
     voice = EMOTION_VOICE[emotion]
     vid = brief.get("voice") or spec["voice"]
@@ -107,7 +122,7 @@ def plan(brief):
         "kind": kind,
         "kind_confidence": hit,
         "runtime": brief.get("runtime") or spec["runtime"],
-        "scene": brief.get("scene") or (re.findall(r"\bscene=([\w.-]+)", text) or [None])[0],   # mg: namo/mg/scenes/<scene>/, rd: namo/rd/beats/<scene>.json
+        "scene": scene,     # mg: namo/mg/scenes/<scene>/, rd: namo/rd/beats/<scene>.json
         "style": style,
         "look": look,
         "seconds": seconds,
@@ -123,7 +138,8 @@ def plan(brief):
         "chapters": kind in ("explainer",),
         "budget_usd": float(brief.get("budget_usd") or 0.0),
         "decision": {
-            "why_kind": f"{hit} keyword hit(s)" if hit else "no keyword hit, defaulted to explainer",
+            "why_kind": (f"scene {scene} declares {declared}" if declared in KINDS
+                         else f"{hit} keyword hit(s)" if hit else "no keyword hit, defaulted to explainer"),
             "why_runtime": "CPU motion graphics are free and deterministic",
         },
     }
