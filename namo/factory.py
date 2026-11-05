@@ -17,7 +17,7 @@ A failure is recorded with its cause instead of being found by a human three day
     python namo/factory.py --once --dry
     python namo/factory.py --status
 """
-import json, sys, time, traceback
+import hashlib, json, sys, time, traceback
 from pathlib import Path
 
 NAMO = Path(__file__).resolve().parent
@@ -34,6 +34,12 @@ def load(p, d):
 
 def save(p, o): Path(p).write_text(json.dumps(o, indent=1))
 
+def job_id(job):
+    """One stable id for recording and lookup: the job's own id, else a hash of the normalised brief."""
+    if job.get("id"): return job["id"]
+    brief = {k: (" ".join(v.split()) if isinstance(v, str) else v) for k, v in job.items()}
+    return "job-" + hashlib.sha256(json.dumps(brief, sort_keys=True).encode()).hexdigest()[:12]
+
 def feasible(plan):
     scene = plan.get("scene") or router.SCENE_FOR_KIND.get(plan["kind"])
     if not scene:
@@ -43,12 +49,14 @@ def feasible(plan):
         return False, f"scene '{scene}' is not on disk"
     rt = engine.REGISTRY.get(plan["runtime"])
     if not rt: return False, f"unknown runtime '{plan['runtime']}'"
+    if getattr(rt, "styles", None) and plan["style"] not in rt.styles:
+        return False, f"{plan['runtime']} renders style {', '.join(rt.styles)} only, not '{plan['style']}'"
     ok, why = rt.probe()
     return (True, "ok") if ok else (False, f"{plan['runtime']} not ready: {why}")
 
 def run_job(job):
     t0 = time.time()
-    rec = {"id": job.get("id") or f"job-{int(t0)}", "brief": job.get("prompt",""),
+    rec = {"id": job_id(job), "brief": job.get("prompt",""),
            "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0))}
     plan = router.plan(job)
     rec["plan"] = {k: plan.get(k) for k in ("kind","runtime","style","seconds","ratio","fps","emotion")}
@@ -78,12 +86,12 @@ def once(dry=False):
     jobs = load(QUEUE, {"jobs": []}).get("jobs", [])
     st = load(STATUS, {"runs": []})
     done = {r["id"] for r in st["runs"] if r["state"] == "DONE"}
-    todo = [j for j in jobs if (j.get("id") or j.get("prompt")) not in done]
+    todo = [j for j in jobs if job_id(j) not in done]
     if not todo:
         print("factory: queue empty or fully done"); return 0
     print(f"factory: {len(todo)} job(s)")
     for job in todo:
-        jid = job.get("id") or job.get("prompt","")[:40]
+        jid = job_id(job)
         try:
             rec = dry_run(job, jid) if dry else run_job(job)
         except Exception as e:

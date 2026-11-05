@@ -36,7 +36,7 @@ OUT = ROOT / "out"
 # voice: the kind's default, chosen by measured A/B (HANDOFF.md, voice); a brief may name another id
 KINDS = {
     "webshow":   dict(keywords=["gita","shloka","mahabharata","episode","chapter","verse","dharma","krishna","arjuna","namo"], ratio="16:9", runtime="mg", style="namo-vedic-ink", emotion="deadpan", voice="hi-IN-Chirp3-HD-Charon"),
-    "explainer": dict(keywords=["explain","how","why","what is","tutorial","guide","walkthrough","deep dive"], ratio="16:9", runtime="rd", style="flat-motion-graphics", emotion="energetic", voice="hi-IN-Chirp3-HD-Kore"),
+    "explainer": dict(keywords=["explain","explainer","how","why","what is","tutorial","guide","walkthrough","deep dive"], ratio="16:9", runtime="rd", style="flat-motion-graphics", emotion="energetic", voice="hi-IN-Chirp3-HD-Kore"),
     "customer":  dict(keywords=["ad","promo","campaign","brand","client","launch","commercial","product"], ratio="16:9", runtime="mg", style="clean-professional", emotion="calm", voice="en_US-lessac-medium"),
     "shot-test": dict(keywords=["test","probe","smoke"], ratio="16:9", runtime="mg", style="minimalist-diagram", emotion="deadpan", voice="en_US-lessac-medium"),
 }
@@ -57,19 +57,26 @@ STYLE_LOOK = {
 
 # ------------------------------------------------------------------ brief -> plan
 
+RATIOS = ("16:9", "9:16", "1:1")
+DURATION = re.compile(r"\b(\d{1,2}):(\d{2})\b|\b(\d+)\s*(?:(s\b|sec|second)|m\b|min|minute)", re.I)
+
 def read_seconds(text, default=30):
-    """Find a duration in the brief. '40 second', '2 min', '1:30'."""
-    m = re.search(r"(\d+)\s*(?:s\b|sec|second)", text, re.I)
-    if m: return int(m.group(1))
-    m = re.search(r"(\d+)\s*(?:m\b|min|minute)", text, re.I)
-    if m: return int(m.group(1)) * 60
-    m = re.search(r"\b(\d{1,2}):(\d{2})\b", text)
-    if m: return int(m.group(1)) * 60 + int(m.group(2))
+    """The FIRST duration token in the brief is the film length: '40 second', '2 min', '1:30'.
+    A ratio ('9:16') is never a duration."""
+    for m in DURATION.finditer(text):
+        if m.group(1):
+            if m.group(0) in RATIOS: continue
+            return int(m.group(1)) * 60 + int(m.group(2))
+        return int(m.group(3)) * (1 if m.group(4) else 60)
     return default
 
+def has_word(text, words):
+    """Whole-word hits (a trailing plural 's' allowed): 'how' never matches 'show'."""
+    return sum(1 for w in words if re.search(r"\b%ss?\b" % re.escape(w), text, re.I))
+
 def read_ratio(text):
-    if re.search(r"vertical|9:16|reel|shorts|tiktok|story", text, re.I): return "9:16"
-    if re.search(r"square|1:1|instagram", text, re.I): return "1:1"
+    if has_word(text, ["vertical", "9:16", "reel", "shorts", "tiktok", "story"]): return "9:16"
+    if has_word(text, ["square", "1:1", "instagram"]): return "1:1"
     return "16:9"
 
 def read_emotion(text):
@@ -79,14 +86,13 @@ def read_emotion(text):
         "calm":      ["calm","professional","corporate","clean","soothing"],
         "deadpan":   ["deadpan","flat","matter of fact","dry"],
     }.items():
-        if any(w in text.lower() for w in words): return e
+        if has_word(text, words): return e
     return None
 
 def classify(text):
-    t = text.lower()
     best, score = "explainer", 0
     for kind, spec in KINDS.items():
-        s = sum(1 for k in spec["keywords"] if k in t)
+        s = has_word(text, spec["keywords"])
         if s > score: best, score = kind, s
     return best, score
 
@@ -99,35 +105,45 @@ def declared_kind(scene):
 
 def plan(brief):
     if isinstance(brief, str): brief = {"prompt": brief}
+    def given(k, fallback):
+        """Structured fields win; a supplied 0 is a value (the engine gate judges it), not absence."""
+        v = brief.get(k)
+        return fallback if v is None else v
     text = brief.get("prompt", "")
     # `key=value` selectors pick, they do not describe: keep them out of classification
     # ("scene=gita-1-1" would add a webshow 'gita' hit)
     sel = dict(re.findall(r"\b(\w+)=([\w.-]+)", text))
     prose = re.sub(r"\b\w+=[\w.-]+", " ", text)
-    scene = brief.get("scene") or sel.get("scene")
+    scene = given("scene", sel.get("scene"))
     kind, hit = classify(prose)
     declared = declared_kind(scene) if scene else None
-    if declared in KINDS:          # a named scene's own kind beats keyword guessing
-        kind = declared
+    if brief.get("kind") is not None:
+        if brief["kind"] not in KINDS:
+            raise ValueError("brief kind %r is not one of %s" % (brief["kind"], ", ".join(KINDS)))
+        kind, why_kind = brief["kind"], "brief sets kind"
+    elif declared in KINDS:          # a named scene's own kind beats keyword guessing
+        kind, why_kind = declared, f"scene {scene} declares {declared}"
+    else:
+        why_kind = f"{hit} keyword hit(s)" if hit else "no keyword hit, defaulted to explainer"
     spec = KINDS[kind]
-    seconds = int(brief.get("seconds") or read_seconds(prose))
-    ratio = brief.get("ratio") or read_ratio(prose) or spec["ratio"]
-    emotion = brief.get("emotion") or read_emotion(prose) or spec["emotion"]
-    style = brief.get("style") or spec["style"]
+    seconds = int(given("seconds", read_seconds(prose)))
+    ratio = given("ratio", read_ratio(prose))
+    emotion = given("emotion", read_emotion(prose) or spec["emotion"])
+    style = given("style", spec["style"])
     voice = EMOTION_VOICE[emotion]
-    vid = brief.get("voice") or spec["voice"]
+    vid = given("voice", spec["voice"])
     look = STYLE_LOOK.get(style, STYLE_LOOK["minimalist-diagram"])
     return {
         "prompt": text,
         "kind": kind,
         "kind_confidence": hit,
-        "runtime": brief.get("runtime") or spec["runtime"],
+        "runtime": given("runtime", spec["runtime"]),
         "scene": scene,     # mg: namo/mg/scenes/<scene>/, rd: namo/rd/beats/<scene>.json
         "style": style,
         "look": look,
         "seconds": seconds,
         "ratio": ratio,
-        "fps": int(brief.get("fps") or (30 if kind != "webshow" else 24)),
+        "fps": int(given("fps", 30 if kind != "webshow" else 24)),
         "emotion": emotion,
         "voice": {
             "engine": "chirp3" if "-Chirp3-HD-" in vid else "piper",
@@ -136,10 +152,9 @@ def plan(brief):
         },
         "bed": brief.get("bed"),     # namo/audio/<bed>.flac, ducked under the voice; none unless asked
         "chapters": kind in ("explainer",),
-        "budget_usd": float(brief.get("budget_usd") or 0.0),
+        "budget_usd": float(given("budget_usd", 0.0)),
         "decision": {
-            "why_kind": (f"scene {scene} declares {declared}" if declared in KINDS
-                         else f"{hit} keyword hit(s)" if hit else "no keyword hit, defaulted to explainer"),
+            "why_kind": why_kind,
             "why_runtime": "CPU motion graphics are free and deterministic",
         },
     }

@@ -43,7 +43,8 @@ Measured behaviour (this is the test table; `namo/drift.py` runs it):
 Determinism rules (each was a real bug):
 - Durations are parsed from the **first** duration-like token only, and a ratio (`9:16`,
   `1:1`, `16:9`) is never read as a duration.
-- Explicit overrides in the JSON form always win over anything parsed from the prompt.
+- Explicit overrides in the JSON form (`kind` included) always win over anything parsed from the
+  prompt. A supplied `0` is a value, not absence: it reaches the engine gate and is refused there.
 - Keyword matching is word-boundary, not substring: "how" must not match "show".
 
 ---
@@ -119,13 +120,17 @@ A runtime is a class with `name`, `kind`, `cost_per_sec_usd`, `max_seconds`, `pr
 |---|---|---|---|---|
 | `mg` | cpu | `film` | 0 | vector motion graphics through lemo |
 | ~~`h3`~~ | gpu | — | — | **not an engine runtime.** MiniMax H3 GPU episodes are made by `onenamocom-stack/namo-studio` (`manufacture/namo_pod_run.py`, see its `FACTORY_MANUAL.md`) |
-| `rd` | cpu | `film` | 0 | rendiv (React) motion-design explainers from `namo/rd/beats/<scene>.json` |
+| `rd` | cpu | `film` | 0 | rendiv (React) motion-design explainers from `namo/rd/beats/<scene>.json`, in one style, `flat-motion-graphics` (`namo/rd/STYLE.md`); a job asking for any other style is refused before rendering |
 
 **Invariant R1:** a runtime enters `REGISTRY` only if `probe()` proves it works.
 `probe()` must exercise the thing, not merely observe that files exist:
 
 - `mg.probe()` checks lemo, node, chrome, **ffmpeg and ffprobe**, and that a scene exists.
-- `rd.probe()` renders one second of a beats file at 320x180 and makes the voice speak.
+- `rd.probe()` renders one second of a beats file at 320x180.
+
+A probe proves the renderer, not a voice: the voice backend is the job's choice, so the job
+proves it — `build_voice()` makes every line speak before any picture is rendered, and a voice
+that cannot speak fails the job, not the runtime.
 
 **Invariant R2:** `engine.REGISTRY` is the only door. No pipeline, workflow or script calls a
 renderer directly. `REGISTRY` is populated at import, so any importer sees the same runtimes.

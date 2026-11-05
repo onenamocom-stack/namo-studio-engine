@@ -754,6 +754,9 @@ class RdRuntime(Runtime):
     kind = "cpu"
     produces = "film"
     cost_per_sec_usd = 0.0
+    # namo/rd/src/Explainer.tsx draws one fixed look (namo/rd/STYLE.md); a job asking for
+    # another style is refused, never rendered in this one
+    styles = ("flat-motion-graphics",)
 
     def __init__(self):
         self.dir = NAMO / "rd"
@@ -795,6 +798,9 @@ class RdRuntime(Runtime):
         ok, why = validate_job(job)
         if not ok:
             return {"ok": False, "error": why}
+        if job["style"] not in self.styles:
+            return {"ok": False, "error": "rd renders style %s only; the job asks for %r"
+                    % (", ".join(self.styles), job["style"])}
         src = self.dir / "beats" / (job["scene"] + ".json")
         if not src.exists():
             return {"ok": False, "error": "beats file namo/rd/beats/%s.json is not on disk (have: %s)"

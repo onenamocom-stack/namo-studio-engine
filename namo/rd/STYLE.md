@@ -1,5 +1,7 @@
 # NAMO explainer style (rendiv) — the Codacus bar
 
+Style id: `flat-motion-graphics` — the only style `rd` renders (`RdRuntime.styles`); the engine refuses a job asking for another.
+
 Sources, measured 2026-11-06 with ffmpeg frame grabs + pixel sampling (720p downloads):
 - R1 "I Built a Free AI Video Editor That Replaced Premiere Pro" — youtube.com/watch?v=DxznNEC4GXw (made with rendiv)
 - R2 "1M Context in 500MB?! DeepSeek V4 + TurboQuant Explained" — youtube.com/watch?v=3mX_dc9ZNRA

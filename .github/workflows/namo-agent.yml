@@ -89,28 +89,27 @@ jobs:
 
       - name: decide
         id: decide
+        # overrides are structured fields (agent.py --json), never prose appended to the prompt:
+        # "... 30 second ..." + " 60 seconds" still parsed as 30 (the first duration wins)
         env:
           P: ${{ github.event.inputs.prompt }}
           S: ${{ github.event.inputs.seconds }}
           R: ${{ github.event.inputs.ratio }}
         run: |
-          IN="$P"
-          [ -n "$S" ] && IN="$IN $S seconds"
-          [ -n "$R" ] && IN="$IN $R"
+          python3 - <<'PY'
+          import json, os
+          b = {"prompt": os.environ["P"]}
+          if os.environ["S"]: b["seconds"] = int(os.environ["S"])
+          if os.environ["R"]: b["ratio"] = os.environ["R"]
+          json.dump(b, open("brief.json", "w"))
+          print(json.dumps(b))
+          PY
           set -o pipefail
-          python3 namo/agent.py --dry "$IN" | tee out_plan.json
+          python3 namo/agent.py --dry --json brief.json | tee out_plan.json
 
       - name: make the video
         if: github.event.inputs.dry != '1'
-        env:
-          P: ${{ github.event.inputs.prompt }}
-          S: ${{ github.event.inputs.seconds }}
-          R: ${{ github.event.inputs.ratio }}
-        run: |
-          IN="$P"
-          [ -n "$S" ] && IN="$IN $S seconds"
-          [ -n "$R" ] && IN="$IN $R"
-          python3 namo/agent.py "$IN"     # a refused or rejected film fails the run, so R2 never gets it
+        run: python3 namo/agent.py --json brief.json     # a refused or rejected film fails the run, so R2 never gets it
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -119,7 +118,7 @@ jobs:
           path: |
             out/
             out_plan.json
-          retention-days: 14
+            brief.json
 
       - name: publish to R2
         if: success() && inputs.dry != '1'
