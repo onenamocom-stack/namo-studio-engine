@@ -1,0 +1,93 @@
+# NAMO — customer video. A brand buys a film, not a style.
+# Same engine, hard budget, brand-locked look, fast turnaround. No research stage.
+name: namo-customer
+version: "1.0"
+description: >
+  A client deliverable: brief -> concept options -> lock -> script -> assets -> edit -> deliver.
+  The client's brand book overrides every playbook. Budget and deadline are hard constraints,
+  enforced by the executive producer, not by hope.
+category: commercial
+stability: production
+
+inherits: animated-explainer
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/customer/executive-producer
+  budget_default_usd: 5.00              # a client video can afford more than a webshow
+  budget_hard: true                     # exceeding it fails the run, it does not warn
+  max_revisions_per_stage: 2            # client revisions are the expensive kind
+  max_wall_time_minutes: 120
+  deadline_hard: true
+
+brand:
+  # supplied per job at clients/<client>/brand.json — colours, fonts, logo, do-nots
+  override_playbook: true
+  logo_safe_area_percent: 8
+  colour_contrast_min: 4.5              # WCAG AA, checked on every text card
+  banned_elements: []                   # client fills this; the reviewer enforces it
+
+stages:
+  - name: brief
+    skill: pipelines/customer/brief-director
+    produces: [brief]
+    checkpoint_required: true
+    note: Turns a vague ask into a measurable brief. Runs, length, audience, must-says, must-avoids.
+    success_criteria:
+      - Every must-say appears in the brief verbatim
+      - Length, aspect ratio and deadline are numeric
+      - Budget ceiling stated
+
+  - name: concept
+    skill: pipelines/customer/concept-director
+    required_artifacts_in: [brief]
+    produces: [proposal_packet, decision_log]
+    checkpoint_required: true
+    note: THREE genuinely different concepts with cost and time per concept. Client picks one.
+
+  - name: script
+    skill: pipelines/customer/script-director
+    required_artifacts_in: [proposal_packet]
+    produces: [script]
+    note: Brand voice. No filler, no "in today's world". Every line earns its second.
+
+  - name: storyboard
+    skill: pipelines/customer/storyboard-director
+    required_artifacts_in: [script]
+    produces: [scene_plan]
+    note: Frame-accurate stills for every scene. The client approves a picture, not a description.
+    success_criteria:
+      - A rendered still exists for every scene before approval is requested
+      - Brand colours verified on every still
+
+  - name: assets
+    skill: pipelines/customer/asset-director
+    required_artifacts_in: [scene_plan, script]
+    produces: [asset_manifest]
+    success_criteria:
+      - Cost tracker never exceeds budget_hard
+      - Every asset licence is traceable and commercially clear
+      - Music is cleared for commercial use, not just "royalty free"
+
+  - name: edit
+    skill: pipelines/customer/edit-director
+    required_artifacts_in: [scene_plan, asset_manifest]
+    produces: [edit_decisions]
+    checkpoint_required: true
+    human_approval_default: true
+
+  - name: compose
+    skill: pipelines/customer/compose-director
+    required_artifacts_in: [edit_decisions, asset_manifest]
+    produces: [render_report, final_review]
+    required_tools: [video_compose, audio_mixer]
+    success_criteria:
+      - Delivered in every aspect ratio the brief asked for
+      - Zero all-black frames
+      - Brand colours measured on the output frames, not assumed
+
+  - name: deliver
+    skill: pipelines/customer/deliver-director
+    required_artifacts_in: [render_report, final_review, brief]
+    produces: [delivery_log]
+    note: Master + social cuts + captions + thumbnails + a one-page licence manifest.
