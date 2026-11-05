@@ -283,11 +283,20 @@ class MgRuntime(Runtime):
                    "--q", qs,
                    "--size", "%dx%d" % SIZE_FOR_RATIO[job["ratio"]],
                    "--out", str(out)]
-            r = subprocess.run(cmd, cwd=str(d), env=env, capture_output=True, text=True)
-            log = ((r.stdout or "") + (r.stderr or ""))[-4000:]
+            try:
+                r = subprocess.run(cmd, cwd=str(d), env=env, capture_output=True, text=True)
+            except FileNotFoundError as e:
+                return {"ok": False, "error": "node not found: %s" % e,
+                        "cmd": " ".join(cmd), "cwd": str(d)}
+            except Exception as e:
+                return {"ok": False, "error": "%s: %s" % (type(e).__name__, e),
+                        "cmd": " ".join(cmd), "cwd": str(d)}
+            log = ((r.stdout or "") + (r.stderr or "")).strip()
             if r.returncode != 0:
                 return {"ok": False, "error": "lemo exited %d" % r.returncode,
-                        "cmd": " ".join(cmd), "cwd": str(d), "log": log or "(no output)"}
+                        "cmd": " ".join(cmd), "cwd": str(d),
+                        "log": log[-3000:] or "(both stdout and stderr were empty)",
+                        "video_mjs": str(d / "core/render/video.mjs") if d else ""}
             if not out.exists():
                 return {"ok": False, "error": "lemo reported success but wrote no file", "log": log}
             # SPEC §4 / O1: success is not "a file appeared". Verify here, so a caller using
