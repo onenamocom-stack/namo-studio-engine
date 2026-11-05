@@ -170,7 +170,7 @@ def render(p):
         "emotion": p["emotion"],
         "voice": p["voice"],
         "name": f"{p['kind']}-{scenario}",
-        "workers": 4,
+        "workers": min(6, os.cpu_count() or 2),   # one browser per core; 4 on a 2-core runner thrashed (~40 min / 60 s)
     }
     OUT.mkdir(exist_ok=True)
     jobfile = OUT / "job.json"
