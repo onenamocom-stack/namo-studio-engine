@@ -1,0 +1,140 @@
+# NAMO — long-format explainer. The Codacus-shaped video: 20-40 min, one idea taught properly.
+# Same engine, different spine: here the ink-wash character PERFORMS the concept
+# instead of narrating a shloka. GPU only where motion footage is genuinely needed.
+name: namo-explainer
+version: "1.0"
+description: >
+  A long-form teaching video: research -> angle -> script -> beat-grid -> assets -> edit -> compose.
+  Visual grammar is ink-theater (hand-drawn character acting out the idea) plus flat-motion-graphics
+  data cards. Deterministic vector motion, so the same brief renders the same film every time.
+category: explainer
+stability: production
+
+inherits: animated-explainer
+
+orchestration:
+  mode: executive-producer
+  skill: pipelines/explainer/executive-producer
+  budget_default_usd: 3.00
+  max_revisions_per_stage: 3
+  max_wall_time_minutes: 90
+
+compatible_playbooks:
+  recommended:
+    - namo-vedic-ink
+    - flat-motion-graphics
+  also_works:
+    - clean-professional
+    - minimalist-diagram
+  custom_allowed: true
+
+# ---- what makes a long-format video not fall apart ----
+structure:
+  chapter_system: true                  # chapters drive the timeline, not the other way round
+  chapter_min_seconds: 90
+  chapter_max_seconds: 420
+  cold_open_seconds: 25                 # hook before the title
+  chapter_card_seconds: 2.5             # the big outlined number
+  recap_at: [0.33, 0.66]                # re-anchor the viewer twice
+  outro_seconds: 40
+  caption_bar: true                     # persistent bottom caption, word-level if TTS gives timing
+
+emotion:
+  # the answer to "full video with emotions". Three independent dials, all code:
+  voice:
+    engine: piper                       # swap to elevenlabs / chirp3 by editing providers
+    direction: |
+      Slightly fast. Conversational, not broadcast. Land the verb, trail the clause.
+      One beat of silence before a reveal. Never read a list with the same intonation twice.
+  performance:
+    engine: ink-theater                 # mocap clips + FABRIK IK + closed-form springs
+    clips: [walk, run, jump, kick, wave, sit, dance_spin, shuffle, twist, march, climb]
+    spring_ease: true                   # anticipation / overshoot / settle per gesture
+    boil_fps: 9                         # hand-drawn line life
+  pacing:
+    scene_hold: [1.5, 8.0]
+    transition_seconds: 0.3
+    hard_cut_on: [claim, number, reversal]    # hard cut to punch a point
+
+stages:
+  - name: research
+    skill: pipelines/explainer/research-director
+    produces: [research_brief]
+    note: Live web is mandatory here (unlike the webshow). At least 3 existing pieces mapped.
+    success_criteria:
+      - At least 5 sources with URLs
+      - At least 3 genuinely different angles
+      - At least 3 specific data points, sourced
+
+  - name: proposal
+    skill: pipelines/explainer/proposal-director
+    required_artifacts_in: [research_brief]
+    produces: [proposal_packet, decision_log]
+    checkpoint_required: true
+    note: Owner approves the angle before a single rupee or token is spent.
+
+  - name: script
+    skill: pipelines/explainer/script-director
+    required_artifacts_in: [proposal_packet]
+    produces: [script]
+    note: Writes to chapters. Each chapter carries its own hook, its own turn, its own landing.
+    success_criteria:
+      - Word count within 5% of measured TTS duration at the chosen speed
+      - Every chapter opens with a concrete image, not a definition
+      - No chapter ends on a summary sentence
+
+  - name: beat_grid
+    skill: pipelines/namo/beat-director
+    required_artifacts_in: [script]
+    produces: [beat_grid]
+    note: >
+      The single source of truth for timing. Speech is measured, never guessed:
+      word-count/2.6wps is not a duration. Beat durations come from the real TTS file.
+    success_criteria:
+      - Beat durations derived from measured TTS + 0.3 s air
+      - Every subtitle cue fits its beat
+      - Beat grid exported as JSON that the renderer reads directly
+
+  - name: scene_plan
+    skill: pipelines/explainer/scene-director
+    required_artifacts_in: [beat_grid]
+    produces: [scene_plan]
+    note: >
+      Picks a runtime per beat from the animation-runtime-selector:
+      ink-theater (character acts), flat-mg (data card), mg (diagram), h3 (footage), plate (still).
+    success_criteria:
+      - No 3+ consecutive beats of the same runtime
+      - Every runtime named is actually available in preflight
+      - Chapter cards present at every chapter boundary
+
+  - name: assets
+    skill: pipelines/explainer/asset-director
+    required_artifacts_in: [scene_plan, script, beat_grid]
+    produces: [asset_manifest]
+    tools_available: [tts_selector, image_selector, video_selector, diagram_gen, music_gen, math_animate]
+    success_criteria:
+      - All narration generated and its real duration re-measured
+      - All vector scenes render a non-blank still before the full render is allowed
+      - Total cost within approved budget
+
+  - name: edit
+    skill: pipelines/explainer/edit-director
+    required_artifacts_in: [scene_plan, asset_manifest]
+    produces: [edit_decisions]
+
+  - name: compose
+    skill: pipelines/explainer/compose-director
+    required_artifacts_in: [edit_decisions, asset_manifest]
+    produces: [render_report, final_review]
+    required_tools: [video_compose, audio_mixer]
+    success_criteria:
+      - Duration within 5% of target
+      - Zero all-black frames (YAVG variance across the full timeline)
+      - Audio -16 LUFS +/- 1, dialogue always above music
+      - Chapters, captions and the cold open all present
+
+  - name: publish
+    skill: pipelines/explainer/publish-director
+    required_artifacts_in: [render_report, final_review]
+    produces: [publish_log]
+    tools_available: [export_bundle]
