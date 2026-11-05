@@ -107,7 +107,7 @@ def plan(brief):
         "kind": kind,
         "kind_confidence": hit,
         "runtime": brief.get("runtime") or spec["runtime"],
-        "scene": brief.get("scene"),      # mg: namo/mg/scenes/<scene>/, rd: namo/rd/beats/<scene>.json
+        "scene": brief.get("scene") or (re.findall(r"\bscene=([\w.-]+)", text) or [None])[0],   # mg: namo/mg/scenes/<scene>/, rd: namo/rd/beats/<scene>.json
         "style": style,
         "look": look,
         "seconds": seconds,

@@ -22,7 +22,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: {node-version: "22"}
+        with: {node-version: "22", cache: npm, cache-dependency-path: namo/rd/package-lock.json}
       - uses: actions/setup-python@v5
         with: {python-version: "3.11"}
 
@@ -53,13 +53,36 @@ jobs:
             ftm
             lemo
             .venv
-          key: namo-engines-v2-${{ hashFiles('namo/bootstrap.sh') }}
+          key: namo-engines-v3-${{ hashFiles('namo/bootstrap.sh') }}
 
       - name: bootstrap
         run: bash namo/bootstrap.sh
 
+      # rd runtime (explainers): as factory.yml - rendiv deps + playwright's chromium, cached per lockfile
+      - uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('namo/rd/package-lock.json') }}
+
+      - name: rd deps (rendiv)
+        working-directory: namo/rd
+        run: |
+          npm ci --no-audit --no-fund
+          npx playwright install --with-deps chromium
+
+      # piper voices, as factory.yml (a brief may name a piper voice)
+      - uses: actions/cache@v4
+        with:
+          path: .voices
+          key: piper-voices-v1-hi_IN-pratham-medium-en_US-lessac-medium
+
+      - name: voice (piper)
+        run: |
+          python3 -m pip install -q piper-tts==1.3.0
+          python3 -m piper.download_voices --data-dir .voices hi_IN-pratham-medium en_US-lessac-medium
+
       - name: engine probe
-        run: python3 namo/engine.py runtimes --probe
+        run: python3 namo/engine.py probe || true
 
       - name: decide
         id: decide
@@ -84,7 +107,7 @@ jobs:
           IN="$P"
           [ -n "$S" ] && IN="$IN $S seconds"
           [ -n "$R" ] && IN="$IN $R"
-          python3 namo/agent.py "$IN" || echo "AGENT REPORTED A FAILURE (see guard output above)"
+          python3 namo/agent.py "$IN"     # a refused or rejected film fails the run, so R2 never gets it
 
       - uses: actions/upload-artifact@v4
         if: always()
