@@ -21,7 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 90
     steps:
+      # the branch tip at start, not the trigger sha: a run queued behind another factory run must see its status.json
+      # (else it re-renders DONE jobs and its status commit conflicts with the one pushed meanwhile)
       - uses: actions/checkout@v4
+        with: {ref: "${{ github.ref }}"}
       - uses: actions/setup-node@v4
         with: {node-version: "22", cache: npm, cache-dependency-path: namo/rd/package-lock.json}
       - uses: actions/setup-python@v5
