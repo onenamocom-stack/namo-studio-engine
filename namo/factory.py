@@ -58,7 +58,8 @@ def run_job(job):
     plan["scene"] = plan.get("scene") or router.SCENE_FOR_KIND[plan["kind"]]
     res = router.render(plan)
     if res.get("ok"): rec.update(state="DONE", out=res["out"], guard=res["guard"])
-    else: rec.update(state="FAILED", reason=res.get("error"), log=(res.get("log") or "")[-800:])
+    else: rec.update(state="FAILED", reason=res.get("error"), cmd=res.get("cmd"), cwd=res.get("cwd"),
+                   log=(res.get("log") or "")[-1500:])
     rec["seconds"] = round(time.time()-t0, 1)
     return rec
 
