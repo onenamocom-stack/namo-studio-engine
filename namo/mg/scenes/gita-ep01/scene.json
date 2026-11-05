@@ -1,0 +1,15 @@
+{
+ "schema": "namo.scene/1",
+ "kind": "webshow",
+ "ratio": "16:9",
+ "seconds": 60,
+ "style": "namo-vedic-ink",
+ "emotion": "deadpan",
+ "voice": {
+  "engine": "piper",
+  "id": "hi_IN-pratham-medium",
+  "rate": 1.0
+ },
+ "applicable": false,
+ "note": "This scene is AUTHORED, not plan-driven: it does not read location.search, so it always renders at 60 s / 16:9 / namo-vedic-ink regardless of the brief. That is declarative.js D6b. The engine accepts it only for a brief that already matches these values, and the output guard rejects anything else. Set applicable=true once main.js reads the query."
+}
