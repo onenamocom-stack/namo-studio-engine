@@ -1,1 +1,24 @@
-{"runs": []}
+{
+ "runs": [
+  {
+   "id": "gita-ep01",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-05T19:53:07Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "state": "FAILED",
+   "reason": "render failed",
+   "cmd": null,
+   "cwd": null,
+   "log": "Frame)'.\n[page] TypeError: The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n    at shotHall (http://127.0.0.1:38481/films/webshow-gita-ep01-3851/shots.js:43:5)\n    at Module.frame (htt\n[page] [RENDERFAULT t=14.916666666666666] Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n[page] TypeError: The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n    at shotHall (http://127.0.0.1:38481/films/webshow-gita-ep01-3851/shots.js:43:5)\n    at Module.frame (htt\n[page] [RENDERFAULT t=14.958333333333334] Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n[page] TypeError: The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n    at shotHall (http://127.0.0.1:38481/films/webshow-gita-ep01-3851/shots.js:43:5)\n    at Module.frame (htt",
+   "seconds": 1148.3
+  }
+ ]
+}
