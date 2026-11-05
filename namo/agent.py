@@ -132,17 +132,30 @@ def sh(cmd, **kw):
 
 def step(msg): print(f"[agent] {msg}", flush=True)
 
+SCENE_FOR_KIND = {
+    # a kind maps to a scene only when that scene actually exists for it.
+    # gita-ep01 is a webshow scene; the explainer/customer kinds have none yet, on purpose.
+    "webshow": "gita-ep01",
+}
+
+def SCENES_AVAILABLE():
+    d = NAMO / "mg" / "scenes"
+    return {x.name for x in d.iterdir() if x.is_dir()} if d.exists() else set()
+
 def render(p):
     """Hand the plan to the engine. The engine owns the renderers; the agent owns the decision."""
     sys.path.insert(0, str(NAMO))
     import importlib
     engine = importlib.import_module("engine")
 
-    scenario = p.get("scene")
+    scenario = p.get("scene") or SCENE_FOR_KIND.get(p["kind"])
     if not scenario:
-        # a brief with no authored scene still has to produce something honest:
-        # the agnostic test card, so the pipeline is provably alive end to end.
-        scenario = "gita-ep01"
+        # An honest refusal beats a wrong film. If the brief asks for a kind that has no
+        # authored scene yet, say so and name the fix; never render another kind's scene.
+        have = ", ".join(sorted(SCENES_AVAILABLE())) or "none"
+        return {"ok": False,
+                "error": f"no scene authored for kind '{p['kind']}'. "
+                         f"scenes on disk: {have}. Add namo/mg/scenes/<name>/ or pass scene=<name>."}
     job = {"scene": scenario, "fps": p["fps"], "workers": 4,
            "name": f"{p['kind']}-{scenario}", "seconds": p["seconds"]}
     OUT.mkdir(exist_ok=True)
