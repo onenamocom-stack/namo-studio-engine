@@ -110,15 +110,6 @@ hyperframes-warm:
 	npx --yes --prefer-online hyperframes --version
 	@echo "==> Cache warm complete."
 
-demo: ensure-venv
-	@echo "==> Rendering zero-key demo videos (no API keys needed)..."
-	@echo "    These use only Remotion components — animated charts, text, data viz."
-	@echo ""
-	$(RUN_PYTHON) render_demo.py
-
-demo-list: ensure-venv
-	$(RUN_PYTHON) render_demo.py --list
-
 lint: ensure-venv
 	$(RUN_PYTHON) -m py_compile tools/base_tool.py
 	$(RUN_PYTHON) -m py_compile tools/tool_registry.py
