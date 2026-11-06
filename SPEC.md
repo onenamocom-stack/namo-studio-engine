@@ -149,6 +149,13 @@ A render is accepted only if `verify_video()` passes. All of these are hard:
 | duration | `abs(dur - seconds) <= max(0.5, seconds * 0.02)` | a 57 s film is not a 60 s film |
 | duration target | `seconds > 0` or refuse | cannot verify without a target |
 | pixels | blank frames <= 0 % | sampled at 1 fps, 64x36, luma stddev < 1.0 is blank |
+| paper | >= 55 % of samples within ±30 RGB of the scene's paper (`scene.json "paper_rgb"`, default `#F2ECDE`) | a frame the compositor never painted is not a style choice |
+| ink | >= 2 % of samples darker than 72 % of the paper | paper with nothing drawn on it is not a film; "pillars only, no king" also fails |
+| software GL | reject when the render log says `[note] WebGL runs on software rendering` | on a GPU-less runner the compositor itself is broken, so its output cannot be judged |
+
+The paper check is **O5** and is skipped only when a runtime declares no paper scene (`paper=None`,
+which is `rd`). The blue Gita frame of 2026-11-05 is the case that forced it: the old guard sampled
+luma stddev only, so an all-blue frame and a cream frame were indistinguishable.
 
 **Invariant O1:** "the file exists" is never success.
 **Invariant O2:** a failure to run a check is a failure. No `except: return True`. If `ffmpeg`,
