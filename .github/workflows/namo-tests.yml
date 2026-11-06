@@ -8,6 +8,7 @@ on:
     paths:
       - 'namo/**.py'
       - 'tests/test_writer.py'
+      - 'tests/test_gates.py'
       - 'tests/test_paper_gate.py'
       - '.github/workflows/namo-tests.yml'
 
@@ -26,5 +27,7 @@ jobs:
           command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
       - name: writer (no ffmpeg needed)
         run: python3 tests/test_writer.py
+      - name: gates (skill rules + A/V sync)
+        run: python3 tests/test_gates.py
       - name: paper gate
         run: python3 tests/test_paper_gate.py
