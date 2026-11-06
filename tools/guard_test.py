@@ -81,8 +81,9 @@ def build(name, filt, secs=6):
     d = os.path.join(tempfile.gettempdir(), "namo-guard")
     os.makedirs(d, exist_ok=True)
     out = os.path.join(d, "%s.mp4" % name)
-    r = subprocess.run([FFMPEG, "-y", "-v", "error", "-f", "lavfi",
-                        "-i", "color=c=black:s=640x360:d=%d,format=rgb24,%s" % (secs, filt),
+    r = subprocess.run([FFMPEG, "-y", "-v", "error",
+                        "-f", "lavfi", "-i", "color=c=black:s=640x360:d=%d" % secs,
+                        "-vf", filt + ",format=rgb24",
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24", out],
                        capture_output=True)
     if r.returncode != 0:
@@ -93,7 +94,7 @@ def build(name, filt, secs=6):
 # paper #F2ECDE = (242,236,222). drawbox paints ink over it.
 PAPER = "0xF2ECDE"
 CASES = [
-    ("BAD_BLUE",  "color=c=0x2850B4:s=640x360,format=rgb24", False,
+    ("BAD_BLUE",  "drawbox=x=0:y=0:w=640:h=360:color=0x2850B4:t=fill", False,
      "flat blue - the compositor never painted paper"),
     ("BAD_EMPTY", "drawbox=x=0:y=0:w=640:h=360:color=%s:t=fill" % PAPER, False,
      "cream paper, nothing drawn - an empty set is not a film"),
