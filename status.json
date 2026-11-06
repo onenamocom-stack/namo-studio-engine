@@ -67,6 +67,30 @@
     "speech": -16.0
    },
    "seconds": 396.4
+  },
+  {
+   "id": "gita-ep01-gate",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-06T07:02:23Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "state": "DONE",
+   "out": "/home/runner/work/namo-studio-engine/namo-studio-engine/out/webshow-gita-ep01.mp4",
+   "guard": "60.0s, 60 frames sampled, 0 blank; audio 60.0s, mean -26.9 dB, max -2.5 dB; speech -15.9 LUFS",
+   "audio": {
+    "I": -24.1,
+    "LRA": 14.9,
+    "TP": -2.5,
+    "speech": -16.0
+   },
+   "seconds": 1246.8
   }
  ]
 }
