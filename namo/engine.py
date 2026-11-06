@@ -48,6 +48,14 @@ SIZE_FOR_RATIO = {
     "9:16": (1080, 1920),
     "1:1":  (1080, 1080),
 }
+# SPEC §4 O5: the film must be the film the scene asked for. A blank-frame test cannot tell a blue
+# frame from a cream one - both fail stddev while empty and both pass once anything is drawn - so the
+# paper colour and the drawn coverage are read from the pixels.
+PAPER = (242, 236, 222)    # ink-wash paper (#F2ECDE); a scene may declare its own via scene.json "paper_rgb"
+PAPER_TOL = 30             # per channel, 8-bit RGB
+PAPER_SHARE = 0.55         # >= this share of samples must be paper
+CONTENT_SHARE = 0.02       # >= this share must be ink, so "pillars only, no king" also fails
+SOFTWARE_GL = "software rendering"   # lemo logs "[note] WebGL runs on software rendering": compositor output untrustworthy
 BLANK_RATIO = 0.0          # SPEC §4: blank frames <= 0 %
 SILENT_MEAN_DB = -50.0     # SPEC §4: an audio track whose mean volume is below this is silence
 
@@ -735,7 +743,8 @@ class MgRuntime(Runtime):
             log += "\naudio: speech %(speech).1f LUFS; film I %(I).1f LUFS, LRA %(LRA).1f LU, TP %(TP).1f dBTP" % audio
             # SPEC §4 / O1: success is not "a file appeared". Verify here, so a caller using
             # REGISTRY directly gets the same guarantee as the CLI.
-            good, msg = verify_video(out, job["seconds"], job["voice"], lines)
+            good, msg = verify_video(out, job["seconds"], job["voice"], lines,
+                                      paper=scene_paper(SCENES / job["scene"]))
             if not good:
                 return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
             return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log,
@@ -842,7 +851,7 @@ class RdRuntime(Runtime):
             if err:
                 return {"ok": False, "error": err, "log": log[-3000:], "voice": lines}
             log += "\naudio: speech %(speech).1f LUFS; film I %(I).1f LUFS, LRA %(LRA).1f LU, TP %(TP).1f dBTP" % audio
-            good, msg = verify_video(out, job["seconds"], job["voice"], lines)
+            good, msg = verify_video(out, job["seconds"], job["voice"], lines, paper=None)   # rd: no paper scene
             if not good:
                 return {"ok": False, "out": str(out), "error": "rejected: " + msg, "log": log, "voice": lines}
             return {"ok": True, "out": str(out), "produces": "film", "verified": msg, "log": log, "voice": lines,
@@ -869,13 +878,71 @@ def register_proven():
 
 # ------------------------------------------------------------------ §4 verify
 
-def verify_video(path, seconds, voice=None, lines=None):
+def scene_paper(scene_dir=None, meta=None):
+    """The paper colour a scene declares (scene.json "paper_rgb"), else the ink-wash paper. A runtime
+    with no paper scene passes None and the colour check is skipped for it."""
+    m = meta
+    if m is None and scene_dir:
+        f = Path(scene_dir) / "scene.json"
+        if f.exists():
+            try:
+                m = json.loads(f.read_text())
+            except Exception:
+                m = None
+    if m and isinstance(m.get("paper_rgb"), (list, tuple)) and len(m["paper_rgb"]) == 3:
+        return tuple(int(c) for c in m["paper_rgb"])
+    return PAPER
+
+
+def paper_check(path, paper=PAPER):
+    """SPEC §4 O5: is this the film the scene asked for? Samples the middle of a 5x4 grid of RGB
+    pixels per second and requires (a) most samples to be the paper colour and (b) some ink to be
+    drawn. Neither a blue frame nor a frame with only scenery can pass. On a GPU-less runner the
+    compositor itself is broken, so a software-GL decode is a rejection too."""
+    ffmpeg = which("ffmpeg")
+    if not ffmpeg:
+        return False, "ffmpeg missing: cannot check the paper colour (SPEC §4 O2: reject, not pass)"
+    r = subprocess.run([ffmpeg, "-v", "error", "-i", path, "-an",
+                        "-vf", "fps=1,scale=160:90", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                       capture_output=True)
+    if r.returncode != 0:
+        return False, "colour sampling failed: %s" % (r.stderr or b"").decode("utf8", "ignore")[:140]
+    w, h, fsz = 160, 90, 160 * 90 * 3
+    raw = r.stdout
+    n = len(raw) // fsz
+    if n == 0 or len(raw) % fsz:
+        return False, "colour sampler returned %d bytes, not whole frames" % len(raw)
+    paper_n = ink_n = total = 0
+    for i in range(n):
+        fr = raw[i * fsz:(i + 1) * fsz]
+        for y in range(h // 8, h, h // 8):                 # 8 rows, whole frame
+            for x in range(w // 16, w, w // 16):           # 16 columns, whole frame
+                o = (y * w + x) * 3
+                px = (fr[o], fr[o + 1], fr[o + 2])
+                total += 1
+                if all(abs(px[c] - paper[c]) <= PAPER_TOL for c in range(3)):
+                    paper_n += 1
+                elif sum(px) < sum(paper) * 0.72:           # darker than the paper: ink
+                    ink_n += 1
+    ps, cs = paper_n / float(total), ink_n / float(total)
+    if ps < PAPER_SHARE:
+        return False, ("paper is not the scene's colour: %.0f%% of samples near %s (< %.0f%%); "
+                       "the render did not paint the paper (software WebGL or a bad composite)"
+                       % (ps * 100, list(paper), PAPER_SHARE * 100))
+    if cs < CONTENT_SHARE:
+        return False, "nothing is drawn on the paper: %.1f%% ink (< %.0f%%)" % (cs * 100, CONTENT_SHARE * 100)
+    return True, "paper %.0f%%, ink %.1f%%" % (ps * 100, cs * 100)
+
+
+def verify_video(path, seconds, voice=None, lines=None, paper=PAPER):
     """
-    SPEC §4 / O1-O3. Returns (ok, reason).
+    SPEC §4 / O1-O5. Returns (ok, reason).
     A failure to run a check is a failure: no bare except that returns True.
     With a voice, the film must also carry an audio stream of the same length that is not silent,
     and its speech - gated to the VO windows in `lines` (the build_voice report) - must sit at
     LUFS +/- LUFS_TOL. A voiced film without its lines cannot be checked, so it is rejected.
+    O5: on a paper scene the paper colour and the ink coverage are measured, so an all-blue or
+    character-less frame is rejected however much detail it carries.
     """
     if isinstance(seconds, bool) or not isinstance(seconds, (int, float)) \
             or not math.isfinite(seconds) or seconds <= 0:
@@ -930,6 +997,10 @@ def verify_video(path, seconds, voice=None, lines=None):
     ratio = flat / float(n)
     if ratio > BLANK_RATIO:
         return False, "%d of %d sampled frames are blank (%.0f%%)" % (flat, n, ratio * 100)
+    if paper is not None:   # None = the runtime has no paper scene (rd); the colour check does not apply
+        ok, why = paper_check(str(p), paper)
+        if not ok:
+            return False, why
     if not voice:
         return True, "%.1fs, %d frames sampled, 0 blank" % (dur, n)
 
