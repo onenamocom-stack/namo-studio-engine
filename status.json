@@ -19,6 +19,54 @@
    "cwd": null,
    "log": "Frame)'.\n[page] TypeError: The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n    at shotHall (http://127.0.0.1:38481/films/webshow-gita-ep01-3851/shots.js:43:5)\n    at Module.frame (htt\n[page] [RENDERFAULT t=14.916666666666666] Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n[page] TypeError: The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n    at shotHall (http://127.0.0.1:38481/films/webshow-gita-ep01-3851/shots.js:43:5)\n    at Module.frame (htt\n[page] [RENDERFAULT t=14.958333333333334] Failed to execute 'drawImage' on 'CanvasRenderingContext2D': The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n[page] TypeError: The provided value is not of type '(CSSImageValue or HTMLCanvasElement or HTMLImageElement or HTMLVideoElement or ImageBitmap or OffscreenCanvas or SVGImageElement or VideoFrame)'.\n    at shotHall (http://127.0.0.1:38481/films/webshow-gita-ep01-3851/shots.js:43:5)\n    at Module.frame (htt",
    "seconds": 1148.3
+  },
+  {
+   "id": "gita-ep01",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-06T00:18:44Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "state": "DONE",
+   "out": "/home/runner/work/namo-studio-engine/namo-studio-engine/out/webshow-gita-ep01.mp4",
+   "guard": "60.0s, 60 frames sampled, 0 blank; audio 60.0s, mean -26.8 dB, max -2.4 dB; speech -15.9 LUFS",
+   "audio": {
+    "I": -24.0,
+    "LRA": 14.7,
+    "TP": -2.4,
+    "speech": -16.0
+   },
+   "seconds": 2738.4
+  },
+  {
+   "id": "gita-1-1-explained",
+   "brief": "explain why a blind king's first question matters \u2014 Bhagavad Gita 1.1, 75 seconds, in Hindi",
+   "started": "2026-11-06T01:04:22Z",
+   "plan": {
+    "kind": "explainer",
+    "runtime": "rd",
+    "style": "flat-motion-graphics",
+    "seconds": 75,
+    "ratio": "16:9",
+    "fps": 30,
+    "emotion": "calm"
+   },
+   "state": "DONE",
+   "out": "/home/runner/work/namo-studio-engine/namo-studio-engine/out/explainer-gita-1-1.mp4",
+   "guard": "75.0s, 75 frames sampled, 0 blank; audio 75.0s, mean -19.8 dB, max -2.5 dB; speech -15.8 LUFS",
+   "audio": {
+    "I": -16.0,
+    "LRA": 3.9,
+    "TP": -2.5,
+    "speech": -16.0
+   },
+   "seconds": 396.4
   }
  ]
 }
