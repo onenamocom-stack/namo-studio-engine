@@ -63,13 +63,11 @@ def run_job(job):
            "started": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime(t0))}
     plan = router.plan(job)
     rec["plan"] = {k: plan.get(k) for k in ("kind","runtime","style","seconds","ratio","fps","emotion")}
-    ok, why = feasible(plan)
-    if not ok:
-        rec.update(state="BLOCKED", reason=why, seconds=round(time.time()-t0,1)); return rec
-    plan["scene"] = plan.get("scene") or router.SCENE_FOR_KIND[plan["kind"]]
+    plan["scene"] = plan.get("scene") or router.SCENE_FOR_KIND.get(plan["kind"])
 
-    # The skills' rules run BEFORE the render, not after: a script that cannot be filled, whose
-    # cuts miss the bed, or whose shots break the show bible is not worth rendering slowly.
+    # ORDER MATTERS. The script is judged first, because "is the script worth shooting" does not
+    # depend on whether a renderer happens to be ready - and asking the renderer first hid every
+    # script verdict behind an unrelated "unknown runtime". A test caught that; keep it fixed.
     try:
         keep = gatekeeper.gate(plan, brief=job.get("prompt", ""), audiomap=job.get("audiomap"))
     except Exception as e:
@@ -85,6 +83,12 @@ def run_job(job):
         return rec
     plan["seconds"] = keep["seconds"]
 
+    # The script is honest; now ask whether anything can actually render it.
+    ok, why = feasible(plan)
+    if not ok:
+        rec.update(state="BLOCKED", reason=why, seconds=round(time.time()-t0, 1))
+        return rec
+
     try:
         res = router.render(plan)
     except Exception as e:
@@ -98,10 +102,23 @@ def run_job(job):
     return rec
 
 def dry_run(job, jid):
-    """Plan + feasibility, no render: the same gate run_job applies, so --dry tells the truth."""
+    """Plan + script gate + feasibility, no render. Same order as run_job, so --dry tells the truth."""
     plan = router.plan(job)
+    plan["scene"] = plan.get("scene") or router.SCENE_FOR_KIND.get(plan["kind"])
+    try:
+        keep = gatekeeper.gate(plan, brief=job.get("prompt", ""), audiomap=job.get("audiomap"))
+    except Exception as e:
+        return {"id": jid, "state": "BLOCKED", "reason": "gatekeeper: %s" % e, "plan": plan}
+    if not keep["ok"]:
+        return {"id": jid, "state": "BLOCKED", "plan": plan,
+                "reason": "script gate: " + "; ".join("%s: %s" % (k, w) for k, w in keep["bad"])[:400],
+                "gates": {k: [bool(v[0]), v[1][:200]] for k, v in keep["results"].items()},
+                "script": {"seconds": keep["seconds"], "beats": len(keep["beats"])}}
+    plan["seconds"] = keep["seconds"]
     ok, why = feasible(plan)
-    return {"id": jid, "state": "DRY" if ok else "BLOCKED", "reason": "feasible" if ok else why, "plan": plan}
+    return {"id": jid, "state": "DRY" if ok else "BLOCKED", "reason": "feasible" if ok else why,
+            "plan": plan, "gates": {k: [bool(v[0]), v[1][:200]] for k, v in keep["results"].items()},
+            "script": {"seconds": keep["seconds"], "beats": len(keep["beats"])}}
 
 def once(dry=False):
     jobs = load(QUEUE, {"jobs": []}).get("jobs", [])
