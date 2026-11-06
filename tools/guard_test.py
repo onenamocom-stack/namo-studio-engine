@@ -68,13 +68,13 @@ def intent_check(raw, px, fb, n):
         if pr < worst[0]:
             worst = (pr, i)
     if flat / float(n) > BLANK_RATIO:
-        return False, "%d/%d frames blank" % (flat, n)
+        return False, "BLANK", "%d/%d frames blank" % (flat, n)
     if good_paper / float(n) < PAPER_FRAME_RATIO:
-        return False, "paper wrong: %d/%d frames, worst frame %d at %.0f%%" % (
+        return False, "PAPER", "paper wrong: %d/%d frames, worst frame %d at %.0f%%" % (
             good_paper, n, worst[1], worst[0] * 100)
     if with_content / float(n) < CONTENT_FRAME_RATIO:
-        return False, "content missing: %d/%d frames" % (with_content, n)
-    return True, "%d frames, paper %d/%d, content %d/%d" % (n, good_paper, n, with_content, n)
+        return False, "CONTENT", "content missing: %d/%d frames" % (with_content, n)
+    return True, "ok", "%d frames, paper %d/%d, content %d/%d" % (n, good_paper, n, with_content, n)
 
 
 def build(name, filt, secs=6):
@@ -93,11 +93,21 @@ def build(name, filt, secs=6):
 
 # paper #F2ECDE = (242,236,222). drawbox paints ink over it.
 PAPER = "0xF2ECDE"
+# Each case must exercise a DIFFERENT check, otherwise a case passing proves nothing
+# about the check it was meant to cover.
 CASES = [
-    ("BAD_BLUE",  "drawbox=x=0:y=0:w=640:h=360:color=0x2850B4:t=fill", False,
-     "flat blue - the compositor never painted paper"),
-    ("BAD_EMPTY", "drawbox=x=0:y=0:w=640:h=360:color=%s:t=fill" % PAPER, False,
-     "cream paper, nothing drawn - an empty set is not a film"),
+    # the real bug: pillars and subtitle ARE drawn, but the compositor never painted paper,
+    # so the frame is blue. Not blank -> must be caught by the PAPER check.
+    ("BAD_BLUE",  "drawbox=x=0:y=0:w=640:h=360:color=0x2850B4:t=fill,"
+                  "drawbox=x=60:y=60:w=90:h=240:color=0x101010:t=fill,"
+                  "drawbox=x=480:y=60:w=90:h=240:color=0x101010:t=fill,"
+                  "drawbox=x=200:y=300:w=240:h=30:color=0xF0F0F0:t=fill", False,
+     "blue ground with ink drawn on it - paper check, not blank check"),
+    # cream paper, one small mark: has SOME variance so it is not blank, but almost
+    # all of it is empty -> must be caught by the CONTENT check.
+    ("BAD_EMPTY", "drawbox=x=0:y=0:w=640:h=360:color=%s:t=fill,"
+                  "drawbox=x=10:y=10:w=6:h=6:color=0x000000:t=fill" % PAPER, False,
+     "cream paper, nothing drawn - content check, not blank check"),
     ("GOOD",      "drawbox=x=0:y=0:w=640:h=360:color=%s:t=fill,"
                   "drawbox=x=120:y=90:w=200:h=180:color=0x1B1B1B:t=fill,"
                   "drawbox=x=360:y=140:w=160:h=120:color=0x7A3B1F:t=fill" % PAPER, True,
@@ -109,21 +119,26 @@ print("=" * 74)
 for name, filt, expect_ok, why in CASES:
     path = build(name, filt)
     raw, px, fb, n = sample_frames(path)
-    ok, reason = intent_check(raw, px, fb, n)
-    verdict = "PASS" if ok else "FAIL"
+    ok, which, reason = intent_check(raw, px, fb, n)
     good = (ok == expect_ok)
+    # a negative case only proves its check if THAT check is the one that fired
+    want = None if expect_ok else {"BAD_BLUE": "PAPER", "BAD_EMPTY": "CONTENT"}[name]
+    if want and which != want:
+        good = False
+        reason = "caught by %s, not %s - the %s check is untested (want %s)" % (
+            which, want, want, why)
     fails += 0 if good else 1
-    print("%-10s expect=%-4s got=%-4s %s  %s" % (
-        name, "PASS" if expect_ok else "FAIL", verdict, "OK " if good else "WRONG", reason))
+    print("%-10s expect=%-4s got=%-4s via=%-7s %s  %s" % (
+        name, "PASS" if expect_ok else "FAIL", "PASS" if ok else "FAIL",
+        which, "OK " if good else "WRONG", reason))
 
 if len(sys.argv) > 1:
     real = sys.argv[1]
     raw, px, fb, n = sample_frames(real)
-    ok, reason = intent_check(raw, px, fb, n)
-    good = ok
-    fails += 0 if good else 1
-    print("%-10s expect=PASS got=%-4s %s  %s" % (
-        "REAL", "PASS" if ok else "FAIL", "OK " if good else "WRONG", reason))
+    ok, which, reason = intent_check(raw, px, fb, n)
+    fails += 0 if ok else 1
+    print("%-10s expect=PASS got=%-4s via=%-7s %s  %s" % (
+        "REAL", "PASS" if ok else "FAIL", which, "OK " if ok else "WRONG", reason))
 
 print("=" * 74)
 print("RESULT:", "ALL OK" if fails == 0 else "%d WRONG" % fails)
