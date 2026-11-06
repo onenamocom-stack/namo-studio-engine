@@ -5,7 +5,9 @@ namo/factory.py — the factory runs itself.
 No human in the loop for routine work. The factory:
   1. reads the queue          (queue.json)
   2. plans each job           (agent.plan — deterministic, no model)
-  3. checks feasibility       (does the scene exist? is the runtime ready?)
+  3. writes the script        (namo/writer.py - every line MEASURED, never assumed)
+  3b. gates that script       (namo/gatekeeper.py - the skills' rules as YES/NO, incl. A/V sync)
+  3c. checks feasibility      (does the scene exist? is the runtime ready?)
   4. renders what it can      (engine registry only)
   5. verifies pixels          (a blank film is a failure, not an output)
   6. records what happened    (status.json)
@@ -27,6 +29,7 @@ QUEUE, STATUS, OUT = ROOT / "queue.json", ROOT / "status.json", ROOT / "out"
 sys.path.insert(0, str(NAMO))
 import agent as router
 import engine
+import gatekeeper
 
 def load(p, d):
     try: return json.loads(Path(p).read_text())
@@ -64,6 +67,24 @@ def run_job(job):
     if not ok:
         rec.update(state="BLOCKED", reason=why, seconds=round(time.time()-t0,1)); return rec
     plan["scene"] = plan.get("scene") or router.SCENE_FOR_KIND[plan["kind"]]
+
+    # The skills' rules run BEFORE the render, not after: a script that cannot be filled, whose
+    # cuts miss the bed, or whose shots break the show bible is not worth rendering slowly.
+    try:
+        keep = gatekeeper.gate(plan, brief=job.get("prompt", ""), audiomap=job.get("audiomap"))
+    except Exception as e:
+        rec.update(state="CRASHED", reason="gatekeeper: %s: %s" % (type(e).__name__, str(e)[:300]),
+                   trace=traceback.format_exc()[-1400:], seconds=round(time.time()-t0, 1))
+        return rec
+    rec["script"] = {"seconds": keep["seconds"], "beats": len(keep["beats"])}
+    rec["gates"] = {k: [bool(v[0]), v[1][:200]] for k, v in keep["results"].items()}
+    if not keep["ok"]:
+        rec.update(state="BLOCKED",
+                   reason="script gate: " + "; ".join("%s: %s" % (k, w) for k, w in keep["bad"])[:700],
+                   seconds=round(time.time()-t0, 1))
+        return rec
+    plan["seconds"] = keep["seconds"]
+
     try:
         res = router.render(plan)
     except Exception as e:
