@@ -1,0 +1,28 @@
+name: paper-gate
+
+# SPEC §4 O5: proves a film that is not the film the scene asked for is rejected -
+# an all-blue frame and an empty cream frame must both fail, real cream+ink must pass.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tests/test_paper_gate.py'
+      - 'namo/engine.py'
+      - '.github/workflows/paper-gate.yml'
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: ffmpeg
+        run: |
+          set -eu
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+          ffmpeg -version | head -1
+      - name: paper gate
+        run: python3 tests/test_paper_gate.py
