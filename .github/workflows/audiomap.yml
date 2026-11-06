@@ -1,0 +1,34 @@
+name: audiomap
+
+# The bed's beat grid, measured once and committed. The sync gate reads it; nothing invents it.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'namo/audio/**.flac'
+      - 'tools/make_audiomap.py'
+      - '.github/workflows/audiomap.yml'
+
+jobs:
+  map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: ffmpeg
+        run: |
+          set -eu
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+      - name: librosa
+        run: pip install -q librosa soundfile numpy
+      - name: build the map
+        run: python3 tools/make_audiomap.py namo/audio/tanpura.flac out/audiomap.json
+      - name: show it
+        run: python3 -c "import json;d=json.load(open('out/audiomap.json'));print('bpm',d.get('bpm'));print('beats',len(d.get('beats') or []));print('duration',d.get('duration'));print('how',d.get('how'))"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiomap
+          path: out/audiomap.json
