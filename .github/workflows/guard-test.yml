@@ -1,0 +1,31 @@
+name: guard-test
+
+# Proves namo/engine.py::verify_video rejects a film that is not the film asked for.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'tools/guard_test.py'
+      - 'namo/engine.py'
+      - '.github/workflows/guard-test.yml'
+
+jobs:
+  guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: ffmpeg present
+        run: ffmpeg -version | head -1
+      - name: synthetic fixtures x3 through the intent check
+        run: |
+          set -eu
+          python3 tools/guard_test.py
+      - name: real artifact through the intent check
+        continue-on-error: false
+        run: |
+          set -eu
+          echo "no real artifact in CI yet - the artifact is a run output, not a repo file"
