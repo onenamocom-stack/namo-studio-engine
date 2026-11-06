@@ -7,7 +7,7 @@ Three cases, all synthetic, all measured with the same pixel sampler verify_vide
   GOOD       cream paper + drawn content    -> must PASS
 Plus, if a real film is given as argv[1], it must PASS (the cream gita artifact).
 """
-import subprocess, sys, os, math, re
+import subprocess, sys, os, math, re, tempfile
 
 FFMPEG = os.environ.get("FFMPEG", "ffmpeg")
 FFPROBE = os.environ.get("FFPROBE", "ffprobe")
@@ -78,8 +78,9 @@ def intent_check(raw, px, fb, n):
 
 
 def build(name, filt, secs=6):
-    out = "/workspace/gt/%s.mp4" % name
-    os.makedirs("/workspace/gt", exist_ok=True)
+    d = os.path.join(tempfile.gettempdir(), "namo-guard")
+    os.makedirs(d, exist_ok=True)
+    out = os.path.join(d, "%s.mp4" % name)
     r = subprocess.run([FFMPEG, "-y", "-v", "error", "-f", "lavfi",
                         "-i", "color=c=black:s=640x360:d=%d,format=rgb24,%s" % (secs, filt),
                         "-c:v", "libx264", "-pix_fmt", "yuv420p", "-r", "24", out],
