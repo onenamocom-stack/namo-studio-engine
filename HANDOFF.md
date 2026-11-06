@@ -5,10 +5,39 @@
 
 ```
 brief text -> namo/agent.py (router, deterministic) -> plan
-plan       -> namo/engine.py (runtime: mg | rd)     -> film
-film       -> namo/engine.py verify_video()        -> accept or reject
-queue      -> namo/factory.py                      -> all of the above, unattended -> status.json
+plan       -> namo/writer.py  (screenwriter)       -> beats: text, cast, picture, MEASURED slot
+beats      -> namo/writer.py  gate_beats()          -> 8 binary answers; any NO = no film
+plan+beats -> namo/engine.py  (runtime: mg | rd)    -> film
+film       -> namo/engine.py  verify_video()        -> paper + ink + audio + speech, or reject
+queue      -> namo/factory.py                       -> all of the above, unattended -> status.json
 ```
+
+## The writer is the layer that was missing
+
+Until 2026-11-06 there was no screenwriter. `agent.py` says so itself: it routes, it does not
+think. Every film therefore used a scene someone typed by hand, so line length, beat order and
+who is on screen were whatever the author happened to write. The last shipped webshow put 14 s
+of speech inside a 60 s render; the other 46 s was nothing, which is what "weak film, long
+unnecessary dialogue, music out of sync" means in code.
+
+`namo/writer.py` fixes that by measuring instead of assuming:
+
+- `speak_seconds(text, lang)` counts Devanagari aksharas and converts at 0.191 s/syllable
+  (Hindi) or 0.300 s/syllable (Sanskrit shloka). A line is never timed by character count.
+- `fitting_length(brief, want)` returns the film the script can honestly carry. Ask for 60 s
+  with three verses and it gives **47 s**, not a padded 60 s.
+- `to_shots()` gives each beat a slot of at most `MAX_HOLD_RATIO` (1.6x) its own speech, so a
+  shot can never hold 12 s over a 4 s line.
+- `gate_beats()` answers eight questions YES/NO and refuses on any NO: fits the film, no line
+  overruns its shot, every speaking beat has a speaker, no empty beat, every shloka followed by
+  its explain (the owner's Sanskrit rule), no repeated picture, no shot drags, film filled to 85 %.
+
+`tests/test_writer.py` pins each of those against the defect it prevents, including the
+14 s-in-60 s shape of the last shipped film. It runs in CI (`.github/workflows/namo-tests.yml`).
+
+**Still not built:** the music beat-grid. `to_shots()` produces slots; nothing aligns a cut to
+the tanpura bed, so "music out of sync" is only half fixed - the picture now has rhythm, the
+bed does not follow it.
 GPU (MiniMax H3) episodes are not an engine runtime; namo-studio makes them.
 
 ## Runner notes (each cost time once)
