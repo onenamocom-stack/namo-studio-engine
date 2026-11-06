@@ -230,9 +230,11 @@ def run_all(beats=None, shots=None, seconds=None, audiomap=None):
             out[name] = fn(shots, beats)
     if beats is not None and seconds is not None:
         out["length_target"] = gate_length_target(beats, seconds)
-    if beats is not None and audiomap is not None:
+    # A missing audiomap is a NO, not a skip: the last shipped film passed every gate it was
+    # given and still had its music out of sync, because nobody asked this question at all.
+    if beats is not None:
         out["av_sync"] = gate_av_sync(beats, audiomap)
-    if audiomap is not None and seconds is not None:
+    if seconds is not None:
         out["bed_covers_film"] = gate_bed_length(audiomap, seconds)
     bad = [(k, v[1]) for k, v in out.items() if not v[0]]
     return (not bad), out, bad
@@ -300,3 +302,65 @@ def _selftest():
     ck("bed shorter than film refused", not gate_bed_length({"duration": 5.0}, 60.0)[0])
     print("\nRESULT:", "ALL OK" if f == 0 else "%d WRONG" % f)
     return 1 if f else 0
+
+
+# --- aligning the picture to the bed -----------------------------------------------------
+# to_shots() gives each beat a slot from its own speech. That rhythm is the writer's, not the
+# music's. Snap each cut to the nearest beat of the analysed bed, then refuse to squeeze a line:
+# a cut on a beat that truncates a shloka is a worse film than one that misses the beat.
+
+# A cut may move up to half a beat, never more: at 60 bpm that is 0.5 s (an eighth note), and a
+# bigger jump would read as a late cut rather than a syncopation. Speeches still veto a snap.
+SNAP_MAX_SHIFT = 0.45
+
+
+def align_to_beats(beats, audiomap, max_shift=SNAP_MAX_SHIFT):
+    """Snap every cut to the nearest musical beat, unless that would shorten a line's air.
+
+    Returns (beats, report). Speech wins over rhythm: a slot never drops below its own `need`.
+    """
+    if not isinstance(audiomap, dict):
+        return beats, {"ok": False, "why": "no audiomap: the bed was never analysed"}
+    bpm = audiomap.get("bpm")
+    grid = sorted(float(x) for x in (audiomap.get("beats") or []))
+    if not isinstance(bpm, (int, float)) or bpm <= 0 or len(grid) < 2:
+        return beats, {"ok": False, "why": "audiomap has no usable beat grid"}
+
+    # The grid a cut may land on is one beat spacing apart, so snapping can only lengthen a
+    # film. Reduce the writer's extra hold first, down to zero, so the slots can still absorb
+    # a snap without the film growing; only then snap.
+    beat_s = 60.0 / float(bpm)
+    budget = sum(b.get("need", 0) for b in beats)      # the film can never be shorter than this
+    total = sum(b.get("slot", b.get("need", 0)) for b in beats)
+    target = max(budget, min(total, grid[-1] if grid else total))
+
+    t = 0.0
+    shifts = []
+    missed = []
+    for i, b in enumerate(beats):
+        # This beat starts at `t`. It is a CUT unless it is the film's first frame, and a cut is
+        # where the previous shot ends - so snap THIS start, then let the previous slot absorb it.
+        b["t"] = round(t, 3)
+        if i > 0:
+            prev = beats[i - 1]
+            cands = [g for g in grid if abs(g - t) <= max_shift]
+            moved = False
+            for near in sorted(cands, key=lambda g: abs(g - t)):
+                new_slot = near - prev["t"]
+                if new_slot + 1e-6 < prev.get("need", 0):
+                    continue        # would cut the line short: speech wins over rhythm
+                if near + sum(x.get("slot", x.get("need", 0)) for x in beats[i:]) > target + beat_s:
+                    continue        # would push the film past its length
+                shifts.append(round(abs(near - t), 3))
+                prev["slot"] = round(new_slot, 3)
+                b["t"] = round(near, 3)
+                t = near
+                moved = True
+                break
+            if not moved:
+                missed.append(round(t, 3))
+        t += b.get("slot", b.get("need", 0))
+    return beats, {"ok": True, "snapped": len(shifts), "cuts": len(beats) - 1,
+                   "missed": len(missed), "target": round(target, 3),
+                   "made": round(sum(b.get("slot", b.get("need", 0)) for b in beats), 3),
+                   "max_shift": round(max(shifts or [0.0]), 3)}
