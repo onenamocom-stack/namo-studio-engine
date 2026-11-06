@@ -1,0 +1,31 @@
+name: paper-diag
+
+on:
+  workflow_dispatch:
+
+jobs:
+  diag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: ffmpeg
+        run: |
+          set -eu
+          command -v ffmpeg >/dev/null || { sudo apt-get update -qq && sudo apt-get install -y -qq ffmpeg; }
+      - name: fetch the film from the factory run
+        uses: actions/download-artifact@v4
+        with:
+          name: factory-out
+          path: art
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: onenamocom-stack/namo-studio-engine
+          run-id: 42178097823
+      - name: what does the gate say about it
+        run: |
+          set -eu
+          ls -la art art/out
+          python3 tools/paper_diag.py art/out/webshow-gita-ep01.mp4
