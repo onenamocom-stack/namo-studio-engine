@@ -18,14 +18,16 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.11'
-      - name: ffmpeg present
-        run: ffmpeg -version | head -1
-      - name: synthetic fixtures x3 through the intent check
+      - name: ffmpeg
+        run: |
+          set -eu
+          if ! command -v ffmpeg >/dev/null; then
+            sudo apt-get update -qq
+            sudo apt-get install -y -qq ffmpeg
+          fi
+          ffmpeg -version | head -1
+          ffprobe -version | head -1
+      - name: synthetic fixtures through the intent check
         run: |
           set -eu
           python3 tools/guard_test.py
-      - name: real artifact through the intent check
-        continue-on-error: false
-        run: |
-          set -eu
-          echo "no real artifact in CI yet - the artifact is a run output, not a repo file"
