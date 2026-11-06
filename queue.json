@@ -14,6 +14,12 @@
    "voice": "hi-IN-Chirp3-HD-Kore",
    "emotion": "calm",
    "bed": "tanpura"
+  },
+  {
+   "id": "gita-ep01-gate",
+   "prompt": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "voice": "hi-IN-Chirp3-HD-Charon",
+   "bed": "tanpura"
   }
  ]
 }
