@@ -1,0 +1,896 @@
+{
+ "note": "written by namo/factory.py on every run; the committed copy is only a placeholder so the Pages monitor has something to read before the first run",
+ "runs": [
+  {
+   "id": "gita-ep01",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-06T13:26:19Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     true,
+     "8 mg shot(s): b00, b01, b02"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-1-1-explained",
+   "brief": "explain why a blind king's first question matters \u2014 Bhagavad Gita 1.1, 75 seconds, in Hindi",
+   "started": "2026-11-06T13:26:19Z",
+   "plan": {
+    "kind": "explainer",
+    "runtime": "rd",
+    "style": "flat-motion-graphics",
+    "seconds": 75,
+    "ratio": "16:9",
+    "fps": 30,
+    "emotion": "calm"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     false,
+     "no mg shot; the ink-wash spine is missing"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: ink_spine: no mg shot; the ink-wash spine is missing; av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-ep01-gate",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-06T13:26:19Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     true,
+     "8 mg shot(s): b00, b01, b02"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-ep01",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-06T22:31:15Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     true,
+     "8 mg shot(s): b00, b01, b02"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-1-1-explained",
+   "brief": "explain why a blind king's first question matters \u2014 Bhagavad Gita 1.1, 75 seconds, in Hindi",
+   "started": "2026-11-06T22:31:15Z",
+   "plan": {
+    "kind": "explainer",
+    "runtime": "rd",
+    "style": "flat-motion-graphics",
+    "seconds": 75,
+    "ratio": "16:9",
+    "fps": 30,
+    "emotion": "calm"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     false,
+     "no mg shot; the ink-wash spine is missing"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: ink_spine: no mg shot; the ink-wash spine is missing; av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-ep01-gate",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-06T22:31:15Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     true,
+     "8 mg shot(s): b00, b01, b02"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-ep01",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-07T03:41:23Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     true,
+     "8 mg shot(s): b00, b01, b02"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-1-1-explained",
+   "brief": "explain why a blind king's first question matters \u2014 Bhagavad Gita 1.1, 75 seconds, in Hindi",
+   "started": "2026-11-07T03:41:23Z",
+   "plan": {
+    "kind": "explainer",
+    "runtime": "rd",
+    "style": "flat-motion-graphics",
+    "seconds": 75,
+    "ratio": "16:9",
+    "fps": 30,
+    "emotion": "calm"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     false,
+     "no mg shot; the ink-wash spine is missing"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: ink_spine: no mg shot; the ink-wash spine is missing; av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  },
+  {
+   "id": "gita-ep01-gate",
+   "brief": "gita chapter 1 shloka 1 episode 1, 60 seconds",
+   "started": "2026-11-07T03:41:23Z",
+   "plan": {
+    "kind": "webshow",
+    "runtime": "mg",
+    "style": "namo-vedic-ink",
+    "seconds": 60,
+    "ratio": "16:9",
+    "fps": 24,
+    "emotion": "deadpan"
+   },
+   "script": {
+    "seconds": 47.0,
+    "beats": 8
+   },
+   "gates": {
+    "transitions": [
+     true,
+     "every transition is a cut or an ink bloom"
+    ],
+    "tempo": [
+     true,
+     "no line is sped past 1.15x"
+    ],
+    "ink_spine": [
+     true,
+     "8 mg shot(s): b00, b01, b02"
+    ],
+    "cut_order": [
+     true,
+     "8 shots in beat order"
+    ],
+    "bijection": [
+     true,
+     "8 ids match one-to-one"
+    ],
+    "warm_light": [
+     true,
+     "every indoor shot is warm"
+    ],
+    "explain_not_on_speaker": [
+     true,
+     "every explain beat is narrator-only"
+    ],
+    "length_target": [
+     true,
+     "47.00s against a 47.00s target"
+    ],
+    "av_sync": [
+     false,
+     "no audiomap: the bed was never analysed, so sync cannot be claimed"
+    ],
+    "bed_covers_film": [
+     false,
+     "no audiomap"
+    ],
+    "writer.fits_the_film": [
+     true,
+     "written"
+    ],
+    "writer.no_speech_overruns_its_shot": [
+     true,
+     "written"
+    ],
+    "writer.every_speaking_beat_has_a_speaker": [
+     true,
+     "written"
+    ],
+    "writer.no_beat_is_empty": [
+     true,
+     "written"
+    ],
+    "writer.sanskrit_rule": [
+     true,
+     "written"
+    ],
+    "writer.no_repeated_picture": [
+     true,
+     "written"
+    ],
+    "writer.no_shot_drags": [
+     true,
+     "written"
+    ],
+    "writer.the_film_is_filled": [
+     true,
+     "written"
+    ],
+    "align": [
+     false,
+     "no audiomap"
+    ]
+   },
+   "state": "BLOCKED",
+   "reason": "script gate: av_sync: no audiomap: the bed was never analysed, so sync cannot be claimed; bed_covers_film: no audiomap; align: no audiomap",
+   "seconds": 0.0
+  }
+ ]
+}
